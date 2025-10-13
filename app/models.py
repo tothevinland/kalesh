@@ -109,3 +109,55 @@ class ReportInDB(BaseModel):
     status: str = "pending"
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
+
+class CommentInDB(BaseModel):
+    """Database model for comments - NOT used for API responses"""
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        json_encoders={ObjectId: str}
+    )
+    
+    id: Optional[PyObjectId] = Field(default=None, alias="_id")
+    video_id: str
+    user_id: str
+    username: str
+    text: str
+    parent_comment_id: Optional[str] = None  # For replies
+    likes: int = 0
+    replies_count: int = 0  # Only for top-level comments
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    is_active: bool = True
+
+
+class CommentLikeInDB(BaseModel):
+    """Database model for comment likes"""
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        json_encoders={ObjectId: str}
+    )
+    
+    id: Optional[PyObjectId] = Field(default=None, alias="_id")
+    comment_id: str
+    user_id: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class CommentReportInDB(BaseModel):
+    """Database model for comment reports"""
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        json_encoders={ObjectId: str}
+    )
+    
+    id: Optional[PyObjectId] = Field(default=None, alias="_id")
+    comment_id: str
+    reporter_id: str
+    reason: str
+    details: Optional[str] = None
+    status: str = "pending"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+

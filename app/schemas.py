@@ -90,3 +90,34 @@ class ReportCreate(BaseModel):
     reason: str = Field(..., min_length=1, max_length=100)
     details: Optional[str] = Field(None, max_length=1000)
 
+
+# Comment Schemas
+class CommentCreate(BaseModel):
+    text: str = Field(..., min_length=1, max_length=1000)
+
+
+class CommentResponse(BaseModel):
+    id: str
+    video_id: str
+    user_id: str
+    username: str
+    text: str
+    parent_comment_id: Optional[str] = None
+    likes: int = 0
+    replies_count: int = 0
+    created_at: datetime
+    user_liked: bool = False  # Whether current user liked this comment
+
+
+class CommentWithReplies(BaseModel):
+    id: str
+    video_id: str
+    user_id: str
+    username: str
+    text: str
+    likes: int = 0
+    replies_count: int = 0
+    created_at: datetime
+    user_liked: bool = False
+    replies: List[CommentResponse] = Field(default_factory=list)
+

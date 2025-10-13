@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.database import connect_to_mongo, close_mongo_connection
-from app.routers import users, videos, interactions, feeds
+from app.routers import users, videos, interactions, feeds, comments
 from app.config import settings
 
 
@@ -52,6 +52,7 @@ app.include_router(users.router)
 app.include_router(videos.router)
 app.include_router(interactions.router)
 app.include_router(feeds.router)
+app.include_router(comments.router)
 
 
 @app.get("/")
