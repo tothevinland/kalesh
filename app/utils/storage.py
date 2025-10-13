@@ -1,7 +1,7 @@
 import boto3
 from botocore.client import Config
 from botocore.exceptions import ClientError
-from typing import Optional
+from typing import Optional, Dict
 import uuid
 from app.config import settings
 
@@ -41,6 +41,51 @@ class R2Storage:
         except ClientError as e:
             raise Exception(f"Failed to upload file to R2")
 
+    async def upload_hls_content(self, hls_data: Dict, video_id: str) -> str:
+        """
+        Upload HLS master playlist, variant playlists, and segments to R2
+        Returns the master playlist URL
+        """
+        try:
+            base_path = f"hls/{video_id}"
+            
+            # Upload master playlist
+            master_key = f"{base_path}/master.m3u8"
+            self.s3_client.put_object(
+                Bucket=self.bucket_name,
+                Key=master_key,
+                Body=hls_data['master_playlist'].encode('utf-8'),
+                ContentType='application/vnd.apple.mpegurl'
+            )
+            
+            # Upload each quality variant
+            for quality, data in hls_data['playlists'].items():
+                # Upload playlist
+                playlist_key = f"{base_path}/{quality}/playlist.m3u8"
+                self.s3_client.put_object(
+                    Bucket=self.bucket_name,
+                    Key=playlist_key,
+                    Body=data['playlist'].encode('utf-8'),
+                    ContentType='application/vnd.apple.mpegurl'
+                )
+                
+                # Upload segments
+                for segment in data['segments']:
+                    segment_key = f"{base_path}/{quality}/{segment['filename']}"
+                    self.s3_client.put_object(
+                        Bucket=self.bucket_name,
+                        Key=segment_key,
+                        Body=segment['data'],
+                        ContentType='video/MP2T'
+                    )
+            
+            # Return master playlist URL
+            master_url = f"{self.public_url}/{master_key}"
+            return master_url
+            
+        except ClientError as e:
+            raise Exception(f"Failed to upload HLS content to R2: {e}")
+
     async def delete_file(self, file_url: str) -> bool:
         """
         Delete file from R2 given its public URL
@@ -57,6 +102,37 @@ class R2Storage:
             return True
         except ClientError as e:
             # Don't raise error on delete failure
+            return False
+    
+    async def delete_hls_content(self, playlist_url: str) -> bool:
+        """
+        Delete all HLS content (master playlist, variants, segments)
+        """
+        try:
+            # Extract video_id from URL
+            # Format: https://domain.com/hls/VIDEO_ID/master.m3u8
+            parts = playlist_url.split('/')
+            if 'hls' in parts:
+                hls_index = parts.index('hls')
+                if len(parts) > hls_index + 1:
+                    video_id = parts[hls_index + 1]
+                    base_path = f"hls/{video_id}/"
+                    
+                    # List all objects with this prefix
+                    response = self.s3_client.list_objects_v2(
+                        Bucket=self.bucket_name,
+                        Prefix=base_path
+                    )
+                    
+                    # Delete all objects
+                    if 'Contents' in response:
+                        for obj in response['Contents']:
+                            self.s3_client.delete_object(
+                                Bucket=self.bucket_name,
+                                Key=obj['Key']
+                            )
+            return True
+        except ClientError as e:
             return False
 
 

@@ -51,24 +51,13 @@ async def upload_video(
         tmp_video_path = tmp_file.name
     
     try:
-        # Process video (extract duration and generate thumbnail)
-        duration, thumbnail_bytes = await video_processor.process_video(tmp_video_path)
+        # Process video to HLS format with multiple qualities
+        duration, thumbnail_bytes, hls_data = await video_processor.process_video_to_hls(tmp_video_path)
         
-        # Upload video to R2
-        video_url = await r2_storage.upload_file(
-            video_content,
-            video.filename,
-            video.content_type
-        )
-        
-        # Upload thumbnail to R2 if generated
-        thumbnail_url = None
-        if thumbnail_bytes:
-            thumbnail_filename = f"thumb_{video.filename}.jpg"
-            thumbnail_url = await r2_storage.upload_file(
-                thumbnail_bytes,
-                thumbnail_filename,
-                "image/jpeg"
+        if not hls_data:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to process video"
             )
         
         # Parse tags
@@ -76,15 +65,15 @@ async def upload_video(
         if tags:
             tags_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
         
-        # Create video document
+        # Create placeholder video document to get ID
         video_doc = {
             "uploader_id": str(current_user["_id"]),
             "uploader_username": current_user["username"],
             "title": title,
             "description": description,
             "tags": tags_list,
-            "video_url": video_url,
-            "thumbnail_url": thumbnail_url,
+            "playlist_url": "processing",  # Temporary
+            "thumbnail_url": None,
             "duration": duration,
             "file_size": file_size,
             "views": 0,
@@ -97,15 +86,41 @@ async def upload_video(
         }
         
         result = await db.videos.insert_one(video_doc)
+        video_id = str(result.inserted_id)
+        
+        # Upload HLS content to R2 (uses video_id for folder structure)
+        playlist_url = await r2_storage.upload_hls_content(hls_data, video_id)
+        
+        # Upload thumbnail to R2 if generated
+        thumbnail_url = None
+        if thumbnail_bytes:
+            thumbnail_filename = f"thumb_{video_id}.jpg"
+            thumbnail_url = await r2_storage.upload_file(
+                thumbnail_bytes,
+                thumbnail_filename,
+                "image/jpeg"
+            )
+        
+        # Update video document with actual URLs
+        await db.videos.update_one(
+            {"_id": ObjectId(video_id)},
+            {"$set": {
+                "playlist_url": playlist_url,
+                "thumbnail_url": thumbnail_url
+            }}
+        )
+        
+        # Fetch updated video
+        video_doc = await db.videos.find_one({"_id": ObjectId(video_id)})
         
         video_response = VideoResponse(
-            id=str(result.inserted_id),
+            id=video_id,
             uploader_id=video_doc["uploader_id"],
             uploader_username=video_doc["uploader_username"],
             title=video_doc["title"],
             description=video_doc["description"],
             tags=video_doc["tags"],
-            video_url=video_doc["video_url"],
+            playlist_url=video_doc["playlist_url"],
             thumbnail_url=video_doc["thumbnail_url"],
             duration=video_doc["duration"],
             views=video_doc["views"],
@@ -117,7 +132,7 @@ async def upload_video(
         
         return APIResponse(
             status="success",
-            message="Video uploaded successfully",
+            message="Video uploaded and processed successfully",
             data={"video": video_response.model_dump()}
         )
     
@@ -185,14 +200,14 @@ async def get_video(
             "saved": save is not None
         }
     
-    video_response = VideoResponse(
+        video_response = VideoResponse(
         id=str(video["_id"]),
         uploader_id=video["uploader_id"],
         uploader_username=video["uploader_username"],
         title=video["title"],
         description=video.get("description"),
         tags=video.get("tags", []),
-        video_url=video["video_url"],
+        playlist_url=video["playlist_url"],
         thumbnail_url=video.get("thumbnail_url"),
         duration=video.get("duration"),
         views=video["views"],
@@ -242,8 +257,8 @@ async def delete_video(
             detail="You can only delete your own videos"
         )
     
-    # Delete from R2
-    await r2_storage.delete_file(video["video_url"])
+    # Delete from R2 (HLS content)
+    await r2_storage.delete_hls_content(video["playlist_url"])
     if video.get("thumbnail_url"):
         await r2_storage.delete_file(video["thumbnail_url"])
     

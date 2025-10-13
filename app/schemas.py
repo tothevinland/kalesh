@@ -40,6 +40,12 @@ class TokenData(BaseModel):
     user_id: Optional[str] = None
 
 
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: dict  # Contains id, username, etc.
+
+
 # Video Schemas
 class VideoUpload(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
@@ -54,7 +60,7 @@ class VideoResponse(BaseModel):
     title: str
     description: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
-    video_url: str
+    playlist_url: str  # HLS master playlist URL
     thumbnail_url: Optional[str] = None
     duration: Optional[float] = None
     views: int = 0

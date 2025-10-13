@@ -65,7 +65,7 @@ class VideoInDB(BaseModel):
     title: str
     description: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
-    video_url: str
+    playlist_url: str  # HLS master playlist URL
     thumbnail_url: Optional[str] = None
     duration: Optional[float] = None
     file_size: int
