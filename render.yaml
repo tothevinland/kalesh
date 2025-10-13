@@ -1,0 +1,37 @@
+# Render Blueprint for Kalesh.me Backend
+# Optional: Use this for automatic deployment
+
+services:
+  - type: web
+    name: kalesh-backend
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: bash build.sh
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: MONGODB_URL
+        sync: false
+      - key: MONGODB_DB_NAME
+        value: kalesh_db
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 30
+      - key: R2_ENDPOINT_URL
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        sync: false
+      - key: R2_PUBLIC_URL
+        sync: false
+      - key: MAX_VIDEO_SIZE_MB
+        value: 200
+      - key: ALLOWED_VIDEO_TYPES
+        value: video/mp4,video/mpeg,video/quicktime,video/x-msvideo,video/webm
+
