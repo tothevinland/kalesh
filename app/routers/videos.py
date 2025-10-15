@@ -9,6 +9,7 @@ from app.auth import get_current_user, get_current_user_optional
 from app.database import get_database
 from app.utils.storage import r2_storage
 from app.utils.video_processing import video_processor
+from app.utils.video_queue import video_queue
 from app.config import settings
 
 router = APIRouter(prefix="/videos", tags=["videos"])
@@ -24,6 +25,7 @@ async def upload_video(
 ):
     """
     Upload a new video (requires authentication)
+    Returns immediately after upload, video will be processed in background
     """
     db = get_database()
     
@@ -45,41 +47,36 @@ async def upload_video(
             detail=f"Video size exceeds maximum limit of {settings.MAX_VIDEO_SIZE_MB}MB"
         )
     
-    # Save to temporary file for processing
-    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(video.filename)[1]) as tmp_file:
-        tmp_file.write(video_content)
-        tmp_video_path = tmp_file.name
-    
     try:
-        # Process video to HLS format with multiple qualities
-        duration, thumbnail_bytes, hls_data = await video_processor.process_video_to_hls(tmp_video_path)
-        
-        if not hls_data:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to process video"
-            )
-        
         # Parse tags
         tags_list = []
         if tags:
             tags_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
         
-        # Create placeholder video document to get ID
+        # Upload RAW video to R2 first (for queue processing later)
+        raw_video_filename = f"raw_{datetime.utcnow().timestamp()}_{video.filename}"
+        raw_video_url = await r2_storage.upload_file(
+            video_content,
+            raw_video_filename,
+            video.content_type
+        )
+        
+        # Create video document with "pending" status
         video_doc = {
             "uploader_id": str(current_user["_id"]),
             "uploader_username": current_user["username"],
             "title": title,
             "description": description,
             "tags": tags_list,
-            "playlist_url": "processing",  # Temporary
+            "playlist_url": raw_video_url,  # Store raw video URL temporarily
             "thumbnail_url": None,
-            "duration": duration,
+            "duration": None,
             "file_size": file_size,
             "views": 0,
             "likes": 0,
             "dislikes": 0,
             "saved_count": 0,
+            "processing_status": "pending",
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow(),
             "is_active": True
@@ -88,31 +85,10 @@ async def upload_video(
         result = await db.videos.insert_one(video_doc)
         video_id = str(result.inserted_id)
         
-        # Upload HLS content to R2 (uses video_id for folder structure)
-        playlist_url = await r2_storage.upload_hls_content(hls_data, video_id)
+        # Add to processing queue
+        video_queue.add_to_queue(video_id, raw_video_url)
         
-        # Upload thumbnail to R2 if generated
-        thumbnail_url = None
-        if thumbnail_bytes:
-            thumbnail_filename = f"thumb_{video_id}.jpg"
-            thumbnail_url = await r2_storage.upload_file(
-                thumbnail_bytes,
-                thumbnail_filename,
-                "image/jpeg"
-            )
-        
-        # Update video document with actual URLs
-        await db.videos.update_one(
-            {"_id": ObjectId(video_id)},
-            {"$set": {
-                "playlist_url": playlist_url,
-                "thumbnail_url": thumbnail_url
-            }}
-        )
-        
-        # Fetch updated video
-        video_doc = await db.videos.find_one({"_id": ObjectId(video_id)})
-        
+        # Return immediately
         video_response = VideoResponse(
             id=video_id,
             uploader_id=video_doc["uploader_id"],
@@ -127,19 +103,72 @@ async def upload_video(
             likes=video_doc["likes"],
             dislikes=video_doc["dislikes"],
             saved_count=video_doc["saved_count"],
+            processing_status=video_doc["processing_status"],
             created_at=video_doc["created_at"]
         )
         
         return APIResponse(
             status="success",
-            message="Video uploaded and processed successfully",
+            message=f"Video uploaded successfully! Processing in queue (position: {video_queue.get_queue_size()})",
             data={"video": video_response.model_dump()}
         )
     
-    finally:
-        # Clean up temporary file
-        if os.path.exists(tmp_video_path):
-            os.unlink(tmp_video_path)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload video: {str(e)}"
+        )
+
+
+@router.get("/{video_id}/status", response_model=APIResponse)
+async def get_video_processing_status(
+    video_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get video processing status (authenticated users only)
+    """
+    db = get_database()
+    
+    # Validate video_id
+    if not ObjectId.is_valid(video_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid video ID"
+        )
+    
+    # Get video
+    video = await db.videos.find_one({"_id": ObjectId(video_id)})
+    if not video:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="not found"
+        )
+    
+    # Check if user owns this video
+    if video["uploader_id"] != str(current_user["_id"]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not your video"
+        )
+    
+    status_info = {
+        "video_id": video_id,
+        "processing_status": video.get("processing_status", "completed"),
+        "queue_position": video_queue.get_queue_size() if video.get("processing_status") == "pending" else 0,
+        "title": video["title"],
+        "created_at": video["created_at"],
+        "updated_at": video.get("updated_at")
+    }
+    
+    if video.get("processing_status") == "failed":
+        status_info["error"] = video.get("processing_error", "Unknown error")
+    
+    return APIResponse(
+        status="success",
+        message="Processing status retrieved",
+        data=status_info
+    )
 
 
 @router.get("/{video_id}", response_model=APIResponse)
@@ -200,7 +229,7 @@ async def get_video(
             "saved": save is not None
         }
     
-        video_response = VideoResponse(
+    video_response = VideoResponse(
         id=str(video["_id"]),
         uploader_id=video["uploader_id"],
         uploader_username=video["uploader_username"],
@@ -214,6 +243,7 @@ async def get_video(
         likes=video["likes"],
         dislikes=video["dislikes"],
         saved_count=video["saved_count"],
+        processing_status=video.get("processing_status", "completed"),
         created_at=video["created_at"],
         user_interaction=user_interaction
     )

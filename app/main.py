@@ -11,8 +11,15 @@ from app.config import settings
 async def lifespan(app: FastAPI):
     # Startup
     await connect_to_mongo()
+    
+    # Start video processing queue worker
+    from app.utils.video_queue import video_queue
+    video_queue.start_worker()
+    
     yield
+    
     # Shutdown
+    video_queue.stop_worker()
     await close_mongo_connection()
 
 

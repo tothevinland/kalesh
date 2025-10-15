@@ -67,6 +67,7 @@ class VideoResponse(BaseModel):
     likes: int = 0
     dislikes: int = 0
     saved_count: int = 0
+    processing_status: str = "completed"  # pending, processing, completed, failed
     created_at: datetime
     user_interaction: Optional[dict] = None  # {"liked": bool, "disliked": bool, "saved": bool}
 

@@ -31,6 +31,7 @@ async def get_trending_videos(
         {
             "$match": {
                 "is_active": True,
+                "processing_status": "completed",
                 "created_at": {"$gte": thirty_days_ago}
             }
         },
@@ -62,6 +63,7 @@ async def get_trending_videos(
     # Get total count
     total = await db.videos.count_documents({
         "is_active": True,
+        "processing_status": "completed",
         "created_at": {"$gte": thirty_days_ago}
     })
     
@@ -109,6 +111,7 @@ async def get_trending_videos(
             likes=video["likes"],
             dislikes=video["dislikes"],
             saved_count=video["saved_count"],
+            processing_status=video.get("processing_status", "completed"),
             created_at=video["created_at"],
             user_interaction=user_interaction
         )
@@ -142,7 +145,7 @@ async def get_recent_videos(
     
     # Get videos sorted by creation date
     videos_cursor = db.videos.find(
-        {"is_active": True}
+        {"is_active": True, "processing_status": "completed"}
     ).sort("created_at", -1).skip(skip).limit(page_size)
     
     videos = await videos_cursor.to_list(length=page_size)
@@ -194,6 +197,7 @@ async def get_recent_videos(
             likes=video["likes"],
             dislikes=video["dislikes"],
             saved_count=video["saved_count"],
+            processing_status=video.get("processing_status", "completed"),
             created_at=video["created_at"],
             user_interaction=user_interaction
         )
@@ -237,7 +241,8 @@ async def get_saved_videos(
     # Get videos
     videos_cursor = db.videos.find({
         "_id": {"$in": video_ids},
-        "is_active": True
+        "is_active": True,
+        "processing_status": "completed"
     })
     videos = await videos_cursor.to_list(length=len(video_ids))
     
@@ -334,7 +339,8 @@ async def get_user_videos(
     # Get user's videos
     videos_cursor = db.videos.find({
         "uploader_id": user_id,
-        "is_active": True
+        "is_active": True,
+        "processing_status": "completed"
     }).sort("created_at", -1).skip(skip).limit(page_size)
     
     videos = await videos_cursor.to_list(length=page_size)
@@ -389,6 +395,7 @@ async def get_user_videos(
             likes=video["likes"],
             dislikes=video["dislikes"],
             saved_count=video["saved_count"],
+            processing_status=video.get("processing_status", "completed"),
             created_at=video["created_at"],
             user_interaction=user_interaction
         )
