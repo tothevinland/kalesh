@@ -17,6 +17,11 @@ async def connect_to_mongo():
     await db.videos.create_index([("views", -1)])
     await db.videos.create_index("uploader_id")
     
+    # Tag-related indexes
+    await db.videos.create_index("tags")  # For tag-based queries
+    await db.videos.create_index([("tags", 1), ("created_at", -1)])  # For explore by tag with sorting
+    await db.videos.create_index([("tags", 1), ("views", -1)])  # For popular videos by tag
+    
     # Comment indexes
     await db.comments.create_index([("video_id", 1), ("created_at", -1)])
     await db.comments.create_index([("parent_comment_id", 1), ("created_at", -1)])
