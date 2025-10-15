@@ -19,7 +19,7 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown
-    video_queue.stop_worker()
+    await video_queue.stop_worker()
     await close_mongo_connection()
 
 

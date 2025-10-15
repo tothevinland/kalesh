@@ -86,7 +86,7 @@ async def upload_video(
         video_id = str(result.inserted_id)
         
         # Add to processing queue
-        video_queue.add_to_queue(video_id, raw_video_url)
+        await video_queue.add_to_queue(video_id, raw_video_url)
         
         # Return immediately
         video_response = VideoResponse(

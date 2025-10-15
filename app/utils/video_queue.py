@@ -1,6 +1,4 @@
 import asyncio
-import threading
-from queue import Queue
 from typing import Optional
 from datetime import datetime
 from bson import ObjectId
@@ -13,35 +11,35 @@ from app.utils.storage import r2_storage
 
 class VideoProcessingQueue:
     def __init__(self):
-        self.queue = Queue()
+        self.queue = asyncio.Queue()
         self.processing = False
-        self.worker_thread = None
+        self.worker_task = None
         
     def start_worker(self):
-        """Start the background worker thread"""
+        """Start the background worker task"""
         if not self.processing:
             self.processing = True
-            self.worker_thread = threading.Thread(target=self._worker, daemon=True)
-            self.worker_thread.start()
+            # Schedule the worker as a background task
+            asyncio.create_task(self._worker())
             print("Video processing worker started")
     
-    def add_to_queue(self, video_id: str, raw_video_url: str):
+    async def add_to_queue(self, video_id: str, raw_video_url: str):
         """Add a video to the processing queue"""
-        self.queue.put({
+        await self.queue.put({
             'video_id': video_id,
             'raw_video_url': raw_video_url,
             'added_at': datetime.utcnow()
         })
         print(f"Video {video_id} added to processing queue. Queue size: {self.queue.qsize()}")
     
-    def _worker(self):
+    async def _worker(self):
         """Background worker that processes videos one by one"""
-        print("Worker thread started, waiting for videos...")
+        print("Worker task started, waiting for videos...")
         
         while self.processing:
             try:
-                # Wait for next video (blocks until available)
-                task = self.queue.get(timeout=1)
+                # Wait for next video with timeout
+                task = await asyncio.wait_for(self.queue.get(), timeout=1.0)
                 
                 video_id = task['video_id']
                 raw_video_url = task['raw_video_url']
@@ -50,15 +48,18 @@ class VideoProcessingQueue:
                 
                 # Process the video
                 try:
-                    asyncio.run(self._process_video(video_id, raw_video_url))
-                    self.queue.task_done()
+                    await self._process_video(video_id, raw_video_url)
                     print(f"Video {video_id} processed successfully")
                 except Exception as process_error:
                     print(f"Error processing video {video_id}: {process_error}")
+                finally:
                     self.queue.task_done()
                 
-            except:
+            except asyncio.TimeoutError:
                 # Queue timeout - this is normal, just continue
+                continue
+            except Exception as e:
+                print(f"Worker error: {e}")
                 continue
     
     async def _process_video(self, video_id: str, raw_video_url: str):
@@ -75,13 +76,19 @@ class VideoProcessingQueue:
             
             # Download raw video to temp file
             temp_path = None
-            response = requests.get(raw_video_url, stream=True, timeout=300)
-            response.raise_for_status()
             
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_file:
-                for chunk in response.iter_content(chunk_size=8192):
-                    tmp_file.write(chunk)
-                temp_path = tmp_file.name
+            def download_file():
+                response = requests.get(raw_video_url, stream=True, timeout=300)
+                response.raise_for_status()
+                
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_file:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        tmp_file.write(chunk)
+                    return tmp_file.name
+            
+            # Run download in thread pool to avoid blocking
+            loop = asyncio.get_event_loop()
+            temp_path = await loop.run_in_executor(None, download_file)
             
             # Process video to HLS
             duration, thumbnail_bytes, hls_data = await video_processor.process_video_to_hls(temp_path)
@@ -137,11 +144,9 @@ class VideoProcessingQueue:
             if 'temp_path' in locals() and temp_path and os.path.exists(temp_path):
                 os.unlink(temp_path)
     
-    def stop_worker(self):
+    async def stop_worker(self):
         """Stop the background worker"""
         self.processing = False
-        if self.worker_thread:
-            self.worker_thread.join(timeout=5)
         print("Video processing worker stopped")
     
     def get_queue_size(self) -> int:
