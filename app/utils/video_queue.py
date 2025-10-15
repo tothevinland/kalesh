@@ -49,14 +49,16 @@ class VideoProcessingQueue:
                 print(f"Processing video {video_id}... Queue remaining: {self.queue.qsize()}")
                 
                 # Process the video
-                asyncio.run(self._process_video(video_id, raw_video_url))
+                try:
+                    asyncio.run(self._process_video(video_id, raw_video_url))
+                    self.queue.task_done()
+                    print(f"Video {video_id} processed successfully")
+                except Exception as process_error:
+                    print(f"Error processing video {video_id}: {process_error}")
+                    self.queue.task_done()
                 
-                self.queue.task_done()
-                print(f"Video {video_id} processed successfully")
-                
-            except Exception as e:
-                if "Empty" not in str(e):
-                    print(f"Worker error: {e}")
+            except:
+                # Queue timeout - this is normal, just continue
                 continue
     
     async def _process_video(self, video_id: str, raw_video_url: str):
