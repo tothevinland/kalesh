@@ -62,6 +62,7 @@ class VideoInDB(BaseModel):
     id: Optional[PyObjectId] = Field(default=None, alias="_id")
     uploader_id: str
     uploader_username: str
+    uploader_profile_image_url: Optional[str] = None
     title: str
     description: Optional[str] = None
     tags: List[str] = Field(default_factory=list)

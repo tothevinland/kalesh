@@ -63,6 +63,7 @@ class VideoResponse(BaseModel):
     id: str
     uploader_id: str
     uploader_username: str
+    uploader_profile_image_url: Optional[str] = None
     title: str
     description: Optional[str] = None
     tags: List[str] = Field(default_factory=list)

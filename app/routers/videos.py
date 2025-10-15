@@ -65,6 +65,7 @@ async def upload_video(
         video_doc = {
             "uploader_id": str(current_user["_id"]),
             "uploader_username": current_user["username"],
+            "uploader_profile_image_url": current_user.get("profile_image_url"),
             "title": title,
             "description": description,
             "tags": tags_list,
@@ -93,6 +94,7 @@ async def upload_video(
             id=video_id,
             uploader_id=video_doc["uploader_id"],
             uploader_username=video_doc["uploader_username"],
+            uploader_profile_image_url=video_doc.get("uploader_profile_image_url"),
             title=video_doc["title"],
             description=video_doc["description"],
             tags=video_doc["tags"],
@@ -266,6 +268,7 @@ async def get_video(
         id=str(video["_id"]),
         uploader_id=video["uploader_id"],
         uploader_username=video["uploader_username"],
+        uploader_profile_image_url=video.get("uploader_profile_image_url"),
         title=video["title"],
         description=video.get("description"),
         tags=video.get("tags", []),
