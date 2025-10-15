@@ -65,12 +65,25 @@ async def like_video(
         
         updated_video = await db.videos.find_one({"_id": ObjectId(video_id)})
         
+        # Check if user has saved this video
+        saved = await db.interactions.find_one({
+            "user_id": user_id,
+            "video_id": video_id,
+            "interaction_type": "save"
+        })
+        
         return APIResponse(
             status="success",
             message="Video unliked",
             data={
                 "action": "removed",
-                "new_count": updated_video["likes"]
+                "likes": updated_video["likes"],
+                "dislikes": updated_video["dislikes"],
+                "user_interaction": {
+                    "liked": False,
+                    "disliked": False,
+                    "saved": saved is not None
+                }
             }
         )
     else:
@@ -88,12 +101,25 @@ async def like_video(
         
         updated_video = await db.videos.find_one({"_id": ObjectId(video_id)})
         
+        # Check if user has saved this video
+        saved = await db.interactions.find_one({
+            "user_id": user_id,
+            "video_id": video_id,
+            "interaction_type": "save"
+        })
+        
         return APIResponse(
             status="success",
             message="Video liked",
             data={
                 "action": "added",
-                "new_count": updated_video["likes"]
+                "likes": updated_video["likes"],
+                "dislikes": updated_video["dislikes"],
+                "user_interaction": {
+                    "liked": True,
+                    "disliked": False,
+                    "saved": saved is not None
+                }
             }
         )
 
@@ -155,12 +181,25 @@ async def dislike_video(
         
         updated_video = await db.videos.find_one({"_id": ObjectId(video_id)})
         
+        # Check if user has saved this video
+        saved = await db.interactions.find_one({
+            "user_id": user_id,
+            "video_id": video_id,
+            "interaction_type": "save"
+        })
+        
         return APIResponse(
             status="success",
             message="Video undisliked",
             data={
                 "action": "removed",
-                "new_count": updated_video["dislikes"]
+                "likes": updated_video["likes"],
+                "dislikes": updated_video["dislikes"],
+                "user_interaction": {
+                    "liked": False,
+                    "disliked": False,
+                    "saved": saved is not None
+                }
             }
         )
     else:
@@ -178,12 +217,25 @@ async def dislike_video(
         
         updated_video = await db.videos.find_one({"_id": ObjectId(video_id)})
         
+        # Check if user has saved this video
+        saved = await db.interactions.find_one({
+            "user_id": user_id,
+            "video_id": video_id,
+            "interaction_type": "save"
+        })
+        
         return APIResponse(
             status="success",
             message="Video disliked",
             data={
                 "action": "added",
-                "new_count": updated_video["dislikes"]
+                "likes": updated_video["likes"],
+                "dislikes": updated_video["dislikes"],
+                "user_interaction": {
+                    "liked": False,
+                    "disliked": True,
+                    "saved": saved is not None
+                }
             }
         )
 
@@ -231,12 +283,29 @@ async def save_video(
         
         updated_video = await db.videos.find_one({"_id": ObjectId(video_id)})
         
+        # Check user's like/dislike status
+        liked = await db.interactions.find_one({
+            "user_id": user_id,
+            "video_id": video_id,
+            "interaction_type": "like"
+        })
+        disliked = await db.interactions.find_one({
+            "user_id": user_id,
+            "video_id": video_id,
+            "interaction_type": "dislike"
+        })
+        
         return APIResponse(
             status="success",
             message="Video removed from saved",
             data={
                 "action": "removed",
-                "new_count": updated_video["saved_count"]
+                "saved_count": updated_video["saved_count"],
+                "user_interaction": {
+                    "liked": liked is not None,
+                    "disliked": disliked is not None,
+                    "saved": False
+                }
             }
         )
     else:
@@ -254,12 +323,29 @@ async def save_video(
         
         updated_video = await db.videos.find_one({"_id": ObjectId(video_id)})
         
+        # Check user's like/dislike status
+        liked = await db.interactions.find_one({
+            "user_id": user_id,
+            "video_id": video_id,
+            "interaction_type": "like"
+        })
+        disliked = await db.interactions.find_one({
+            "user_id": user_id,
+            "video_id": video_id,
+            "interaction_type": "dislike"
+        })
+        
         return APIResponse(
             status="success",
             message="Video saved",
             data={
                 "action": "added",
-                "new_count": updated_video["saved_count"]
+                "saved_count": updated_video["saved_count"],
+                "user_interaction": {
+                    "liked": liked is not None,
+                    "disliked": disliked is not None,
+                    "saved": True
+                }
             }
         )
 
