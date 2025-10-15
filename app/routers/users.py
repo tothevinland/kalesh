@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, UploadFile, File
 from datetime import timedelta
 from bson import ObjectId
 from app.schemas import UserRegister, UserLogin, Token, UserProfile, APIResponse
 from app.auth import get_password_hash, verify_password, create_access_token, get_current_user
 from app.database import get_database
 from app.config import settings
+from app.utils.storage import r2_storage
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -160,4 +161,57 @@ async def get_user_profile_by_username(username: str):
         message="Profile retrieved successfully",
         data={"profile": profile.model_dump()}
     )
+
+
+@router.post("/avatar/upload", response_model=APIResponse)
+async def upload_avatar(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Upload or update user's profile avatar/image
+    """
+    # Validate file type
+    allowed_image_types = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
+    if file.content_type not in allowed_image_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed"
+        )
+    
+    # Validate file size (max 5MB for avatars)
+    max_size = 5 * 1024 * 1024  # 5MB
+    file_data = await file.read()
+    if len(file_data) > max_size:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File size too large. Maximum size is 5MB"
+        )
+    
+    try:
+        # Upload to R2
+        avatar_url = await r2_storage.upload_file(
+            file_data=file_data,
+            filename=f"avatar_{current_user['username']}_{file.filename}",
+            content_type=file.content_type
+        )
+        
+        # Update user's profile_image_url in database
+        db = get_database()
+        await db.users.update_one(
+            {"_id": ObjectId(current_user["_id"])},
+            {"$set": {"profile_image_url": avatar_url}}
+        )
+        
+        return APIResponse(
+            status="success",
+            message="Avatar uploaded successfully",
+            data={"profile_image_url": avatar_url}
+        )
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to upload avatar"
+        )
 

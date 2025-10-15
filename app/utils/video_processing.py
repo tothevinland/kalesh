@@ -76,7 +76,7 @@ class VideoProcessor:
                 
                 # FFmpeg command for HLS
                 cmd = [
-                    'ffmpeg',
+                    '/usr/bin/ffmpeg',
                     '-i', video_path,
                     '-vf', f"scale={settings['width']}:{settings['height']}:force_original_aspect_ratio=decrease",
                     '-c:v', 'libx264',
@@ -136,7 +136,7 @@ class VideoProcessor:
         """Get video height"""
         try:
             cmd = [
-                'ffprobe',
+                '/usr/bin/ffprobe',
                 '-v', 'error',
                 '-select_streams', 'v:0',
                 '-show_entries', 'stream=height',
@@ -155,7 +155,7 @@ class VideoProcessor:
         """Extract video duration using FFprobe"""
         try:
             cmd = [
-                'ffprobe',
+                '/usr/bin/ffprobe',
                 '-v', 'error',
                 '-show_entries', 'format=duration',
                 '-of', 'default=noprint_wrappers=1:nokey=1',
@@ -177,7 +177,7 @@ class VideoProcessor:
                 thumbnail_path = tmp_thumb.name
 
             cmd = [
-                'ffmpeg',
+                '/usr/bin/ffmpeg',
                 '-ss', time_offset,
                 '-i', video_path,
                 '-vframes', '1',
