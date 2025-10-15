@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status, Depends, UploadFile, File, Form
 from typing import Optional, List
 from bson import ObjectId
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import tempfile
 import os
 from app.schemas import VideoUpload, VideoResponse, APIResponse
@@ -181,6 +181,7 @@ async def track_video_view(
     """
     Track a video view (call when video starts playing)
     Works for both authenticated and unauthenticated users
+    Also records to user view history for authenticated users to prevent duplicate recommendations
     """
     db = get_database()
     
@@ -204,6 +205,33 @@ async def track_video_view(
         {"_id": ObjectId(video_id)},
         {"$inc": {"views": 1}}
     )
+    
+    # If user is authenticated, record to view history
+    if current_user:
+        user_id = str(current_user["_id"])
+        now = datetime.now(timezone.utc)
+        expires_at = now + timedelta(days=14)  # History expires after 14 days
+        
+        # Check if this view is already recorded
+        existing_view = await db.user_view_history.find_one({
+            "user_id": user_id,
+            "video_id": video_id
+        })
+        
+        if existing_view:
+            # Update the existing view timestamp
+            await db.user_view_history.update_one(
+                {"_id": existing_view["_id"]},
+                {"$set": {"created_at": now, "expires_at": expires_at}}
+            )
+        else:
+            # Record new view
+            await db.user_view_history.insert_one({
+                "user_id": user_id,
+                "video_id": video_id,
+                "created_at": now,
+                "expires_at": expires_at
+            })
     
     return APIResponse(
         status="success",

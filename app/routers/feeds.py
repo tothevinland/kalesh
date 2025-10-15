@@ -19,6 +19,7 @@ async def get_trending_videos(
 ):
     """
     Get trending videos (sorted by likes + views + recency) with some randomization
+    Excludes videos the user has already seen
     """
     db = get_database()
     
@@ -29,16 +30,38 @@ async def get_trending_videos(
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     
     # Fetch more videos than needed for randomization
-    fetch_size = min(page_size * 3, 100)  # Fetch 3x more videos but cap at 100
+    fetch_size = min(page_size * 5, 150)  # Fetch 5x more videos but cap at 150
+    
+    # Get list of videos the user has already viewed if authenticated
+    excluded_video_ids = []
+    if current_user:
+        user_id = str(current_user["_id"])
+        now = datetime.now(timezone.utc)
+        
+        # Get all videos the user has viewed within the history window
+        viewed_videos_cursor = db.user_view_history.find({
+            "user_id": user_id,
+            "expires_at": {"$gte": now}  # Only consider non-expired history
+        })
+        
+        viewed_videos = await viewed_videos_cursor.to_list(length=1000)  # Reasonable limit
+        excluded_video_ids = [ObjectId(v["video_id"]) for v in viewed_videos]
+    
+    # Create match condition based on whether we have videos to exclude
+    match_condition = {
+        "is_active": True,
+        "processing_status": "completed",
+        "created_at": {"$gte": thirty_days_ago}
+    }
+    
+    # Add exclusion filter if we have videos to exclude
+    if excluded_video_ids:
+        match_condition["_id"] = {"$nin": excluded_video_ids}
     
     # Aggregate pipeline to calculate trending score
     pipeline = [
         {
-            "$match": {
-                "is_active": True,
-                "processing_status": "completed",
-                "created_at": {"$gte": thirty_days_ago}
-            }
+            "$match": match_condition
         },
         {
             "$addFields": {
@@ -149,6 +172,7 @@ async def get_recent_videos(
 ):
     """
     Get recently uploaded videos with some randomization
+    Excludes videos the user has already seen
     """
     db = get_database()
     
@@ -156,15 +180,37 @@ async def get_recent_videos(
     skip = (page - 1) * page_size
     
     # Fetch more videos than needed for randomization
-    fetch_size = min(page_size * 2, 100)  # Fetch 2x more videos but cap at 100
+    fetch_size = min(page_size * 4, 120)  # Fetch 4x more videos but cap at 120
+    
+    # Get list of videos the user has already viewed if authenticated
+    excluded_video_ids = []
+    if current_user:
+        user_id = str(current_user["_id"])
+        now = datetime.now(timezone.utc)
+        
+        # Get all videos the user has viewed within the history window
+        viewed_videos_cursor = db.user_view_history.find({
+            "user_id": user_id,
+            "expires_at": {"$gte": now}  # Only consider non-expired history
+        })
+        
+        viewed_videos = await viewed_videos_cursor.to_list(length=1000)  # Reasonable limit
+        excluded_video_ids = [ObjectId(v["video_id"]) for v in viewed_videos]
+    
+    # Create match condition based on whether we have videos to exclude
+    match_condition = {
+        "is_active": True, 
+        "processing_status": "completed"
+    }
+    
+    # Add exclusion filter if we have videos to exclude
+    if excluded_video_ids:
+        match_condition["_id"] = {"$nin": excluded_video_ids}
     
     # Get videos sorted by creation date with randomization
     pipeline = [
         {
-            "$match": {
-                "is_active": True, 
-                "processing_status": "completed"
-            }
+            "$match": match_condition
         },
         {
             "$sort": {"created_at": -1}
@@ -355,6 +401,7 @@ async def discover_videos(
 ):
     """
     Discover videos - mix of trending and new content
+    Excludes videos the user has already seen
     """
     db = get_database()
     
@@ -365,14 +412,36 @@ async def discover_videos(
     trending_count = max(page_size // 2, 5)  # At least 5 trending videos or half the page size
     new_count = page_size - trending_count    # Fill the rest with new videos
     
+    # Get list of videos the user has already viewed if authenticated
+    excluded_video_ids = []
+    if current_user:
+        user_id = str(current_user["_id"])
+        now = datetime.now(timezone.utc)
+        
+        # Get all videos the user has viewed within the history window
+        viewed_videos_cursor = db.user_view_history.find({
+            "user_id": user_id,
+            "expires_at": {"$gte": now}  # Only consider non-expired history
+        })
+        
+        viewed_videos = await viewed_videos_cursor.to_list(length=1000)  # Reasonable limit
+        excluded_video_ids = [ObjectId(v["video_id"]) for v in viewed_videos]
+    
+    # Create match conditions based on whether we have videos to exclude
+    trending_match = {
+        "is_active": True,
+        "processing_status": "completed",
+        "created_at": {"$gte": thirty_days_ago}
+    }
+    
+    # Add exclusion filter if we have videos to exclude
+    if excluded_video_ids:
+        trending_match["_id"] = {"$nin": excluded_video_ids}
+    
     # Get trending videos
     trending_pipeline = [
         {
-            "$match": {
-                "is_active": True,
-                "processing_status": "completed",
-                "created_at": {"$gte": thirty_days_ago}
-            }
+            "$match": trending_match
         },
         {
             "$addFields": {
@@ -380,7 +449,9 @@ async def discover_videos(
                     "$add": [
                         {"$multiply": ["$likes", 3]},      # Likes weighted 3x
                         {"$multiply": ["$views", 1]},      # Views weighted 1x
-                        {"$multiply": ["$saved_count", 2]} # Saves weighted 2x
+                        {"$multiply": ["$saved_count", 2]}, # Saves weighted 2x
+                        # Add small random factor for variety
+                        {"$multiply": [{"$rand": {}}, 5]}
                     ]
                 }
             }
@@ -389,7 +460,7 @@ async def discover_videos(
             "$sort": {"trending_score": -1}
         },
         {
-            "$limit": trending_count * 3  # Get more than needed for randomization
+            "$limit": trending_count * 5  # Get more than needed for randomization
         },
         {
             "$sample": {"size": trending_count}
@@ -402,19 +473,23 @@ async def discover_videos(
     # Get new videos (excluding those already in trending)
     trending_ids = [str(video["_id"]) for video in trending_videos]
     
+    # Combine excluded videos and trending videos for new video exclusion
+    new_exclude_ids = excluded_video_ids.copy()
+    new_exclude_ids.extend([ObjectId(id) for id in trending_ids])
+    
     new_pipeline = [
         {
             "$match": {
                 "is_active": True,
                 "processing_status": "completed",
-                "_id": {"$nin": [ObjectId(id) for id in trending_ids]}
+                "_id": {"$nin": new_exclude_ids}
             }
         },
         {
             "$sort": {"created_at": -1}
         },
         {
-            "$limit": new_count * 3  # Get more than needed for randomization
+            "$limit": new_count * 5  # Get more than needed for randomization
         },
         {
             "$sample": {"size": new_count}

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Any
 from pydantic import BaseModel, Field, EmailStr, ConfigDict, field_serializer
 from pydantic_core import core_schema
@@ -162,3 +162,17 @@ class CommentReportInDB(BaseModel):
     status: str = "pending"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+
+class UserViewHistoryInDB(BaseModel):
+    """Database model for tracking user view history to prevent duplicate recommendations"""
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        json_encoders={ObjectId: str}
+    )
+    
+    id: Optional[PyObjectId] = Field(default=None, alias="_id")
+    user_id: str
+    video_id: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    expires_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc) + timedelta(days=14))  # History expires after 14 days
