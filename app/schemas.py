@@ -31,6 +31,12 @@ class UserProfile(BaseModel):
     created_at: datetime
 
 
+class UserProfileUpdate(BaseModel):
+    email: Optional[str] = None
+    full_name: Optional[str] = Field(None, max_length=100)
+    bio: Optional[str] = Field(None, max_length=500)
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"

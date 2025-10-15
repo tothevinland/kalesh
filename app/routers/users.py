@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status, Depends, UploadFile, File
 from datetime import timedelta
 from bson import ObjectId
-from app.schemas import UserRegister, UserLogin, Token, UserProfile, APIResponse
+from app.schemas import UserRegister, UserLogin, Token, UserProfile, UserProfileUpdate, APIResponse
 from app.auth import get_password_hash, verify_password, create_access_token, get_current_user
 from app.database import get_database
 from app.config import settings
@@ -159,6 +159,56 @@ async def get_user_profile_by_username(username: str):
     return APIResponse(
         status="success",
         message="Profile retrieved successfully",
+        data={"profile": profile.model_dump()}
+    )
+
+
+@router.put("/profile", response_model=APIResponse)
+async def update_user_profile(
+    profile_data: UserProfileUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Update current user's profile information
+    """
+    db = get_database()
+    
+    # Build update dict (only include fields that are provided)
+    update_fields = {}
+    if profile_data.email is not None:
+        update_fields["email"] = profile_data.email
+    if profile_data.full_name is not None:
+        update_fields["full_name"] = profile_data.full_name
+    if profile_data.bio is not None:
+        update_fields["bio"] = profile_data.bio
+    
+    # If no fields to update, return current profile
+    if not update_fields:
+        updated_user = current_user
+    else:
+        # Update user in database
+        await db.users.update_one(
+            {"_id": ObjectId(current_user["_id"])},
+            {"$set": update_fields}
+        )
+        
+        # Fetch updated user
+        updated_user = await db.users.find_one({"_id": ObjectId(current_user["_id"])})
+    
+    # Return updated profile
+    profile = UserProfile(
+        id=str(updated_user["_id"]),
+        username=updated_user["username"],
+        email=updated_user.get("email"),
+        full_name=updated_user.get("full_name"),
+        bio=updated_user.get("bio"),
+        profile_image_url=updated_user.get("profile_image_url"),
+        created_at=updated_user["created_at"]
+    )
+    
+    return APIResponse(
+        status="success",
+        message="Profile updated successfully",
         data={"profile": profile.model_dump()}
     )
 
