@@ -94,12 +94,64 @@ async def get_trending_videos(
     videos_cursor = db.videos.aggregate(pipeline)
     videos = await videos_cursor.to_list(length=page_size)
     
-    # Get total count
+    # Get total count - don't exclude viewed videos from total count to ensure pagination works correctly
     total = await db.videos.count_documents({
         "is_active": True,
         "processing_status": "completed",
         "created_at": {"$gte": thirty_days_ago}
     })
+    
+    # If we didn't get enough videos due to exclusions, fetch additional videos
+    if len(videos) < page_size and total > 0:
+        # Remove the exclusion filter for a fallback query if needed
+        fallback_match = {
+            "is_active": True,
+            "processing_status": "completed",
+            "created_at": {"$gte": thirty_days_ago}
+        }
+        
+        # Calculate how many more videos we need
+        additional_needed = page_size - len(videos)
+        
+        # Get IDs of videos we already have to exclude them
+        existing_ids = [ObjectId(str(video["_id"])) for video in videos]
+        
+        if existing_ids:
+            fallback_match["_id"] = {"$nin": existing_ids}
+        
+        fallback_pipeline = [
+            {
+                "$match": fallback_match
+            },
+            {
+                "$addFields": {
+                    "trending_score": {
+                        "$add": [
+                            {"$multiply": ["$likes", 3]},
+                            {"$multiply": ["$views", 1]},
+                            {"$multiply": ["$saved_count", 2]},
+                            {"$multiply": [{"$rand": {}}, 10]}
+                        ]
+                    }
+                }
+            },
+            {
+                "$sort": {"trending_score": -1, "created_at": -1}
+            },
+            {
+                "$skip": skip
+            },
+            {
+                "$limit": additional_needed
+            },
+            {
+                "$sample": {"size": additional_needed}
+            }
+        ]
+        
+        fallback_cursor = db.videos.aggregate(fallback_pipeline)
+        additional_videos = await fallback_cursor.to_list(length=additional_needed)
+        videos.extend(additional_videos)
     
     # Format videos with user interactions if authenticated
     video_list = []
@@ -231,8 +283,50 @@ async def get_recent_videos(
     
     videos = await videos_cursor.to_list(length=page_size)
     
-    # Get total count
-    total = await db.videos.count_documents({"is_active": True})
+    # Get total count - don't exclude viewed videos from total count to ensure pagination works correctly
+    total = await db.videos.count_documents({
+        "is_active": True,
+        "processing_status": "completed"
+    })
+    
+    # If we didn't get enough videos due to exclusions, fetch additional videos
+    if len(videos) < page_size and total > 0:
+        # Remove the exclusion filter for a fallback query if needed
+        fallback_match = {
+            "is_active": True,
+            "processing_status": "completed"
+        }
+        
+        # Calculate how many more videos we need
+        additional_needed = page_size - len(videos)
+        
+        # Get IDs of videos we already have to exclude them
+        existing_ids = [ObjectId(str(video["_id"])) for video in videos]
+        
+        if existing_ids:
+            fallback_match["_id"] = {"$nin": existing_ids}
+        
+        fallback_pipeline = [
+            {
+                "$match": fallback_match
+            },
+            {
+                "$sort": {"created_at": -1}
+            },
+            {
+                "$skip": skip
+            },
+            {
+                "$limit": additional_needed
+            },
+            {
+                "$sample": {"size": additional_needed}
+            }
+        ]
+        
+        fallback_cursor = db.videos.aggregate(fallback_pipeline)
+        additional_videos = await fallback_cursor.to_list(length=additional_needed)
+        videos.extend(additional_videos)
     
     # Format videos with user interactions if authenticated
     video_list = []
@@ -508,6 +602,28 @@ async def discover_videos(
         "is_active": True,
         "processing_status": "completed"
     })
+    
+    # If we didn't get enough videos, fetch additional ones without exclusion filters
+    if len(videos) < page_size and total > 0:
+        needed_count = page_size - len(videos)
+        
+        # Get IDs of videos we already have to exclude them from fallback query
+        existing_ids = [ObjectId(str(video["_id"])) for video in videos]
+        
+        fallback_match = {
+            "is_active": True,
+            "processing_status": "completed"
+        }
+        
+        if existing_ids:
+            fallback_match["_id"] = {"$nin": existing_ids}
+        
+        # Simple fallback query to get any remaining videos needed
+        fallback_cursor = db.videos.find(fallback_match).sort("created_at", -1).limit(needed_count)
+        fallback_videos = await fallback_cursor.to_list(length=needed_count)
+        
+        # Add fallback videos to our result set
+        videos.extend(fallback_videos)
     
     # Format videos with user interactions if authenticated
     video_list = []
