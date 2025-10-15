@@ -171,6 +171,45 @@ async def get_video_processing_status(
     )
 
 
+@router.post("/{video_id}/view", response_model=APIResponse)
+async def track_video_view(
+    video_id: str,
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """
+    Track a video view (call when video starts playing)
+    Works for both authenticated and unauthenticated users
+    """
+    db = get_database()
+    
+    # Validate video_id
+    if not ObjectId.is_valid(video_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid video ID"
+        )
+    
+    # Check if video exists
+    video = await db.videos.find_one({"_id": ObjectId(video_id), "is_active": True})
+    if not video:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Video not found"
+        )
+    
+    # Increment view count
+    await db.videos.update_one(
+        {"_id": ObjectId(video_id)},
+        {"$inc": {"views": 1}}
+    )
+    
+    return APIResponse(
+        status="success",
+        message="View tracked",
+        data={"views": video["views"] + 1}
+    )
+
+
 @router.get("/{video_id}", response_model=APIResponse)
 async def get_video(
     video_id: str,
@@ -178,6 +217,7 @@ async def get_video(
 ):
     """
     Get video details (public endpoint, but shows user interaction if authenticated)
+    Does NOT increment view count - use POST /{video_id}/view for that
     """
     db = get_database()
     
@@ -195,13 +235,6 @@ async def get_video(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Video not found"
         )
-    
-    # Increment view count
-    await db.videos.update_one(
-        {"_id": ObjectId(video_id)},
-        {"$inc": {"views": 1}}
-    )
-    video["views"] += 1
     
     # Get user interaction if authenticated
     user_interaction = None
