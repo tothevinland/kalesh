@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 from typing import Optional
 from bson import ObjectId
-from datetime import datetime
+from datetime import datetime, timezone
 from app.schemas import CommentCreate, CommentResponse, CommentWithReplies, APIResponse, ReportCreate
 from app.auth import get_current_user, get_current_user_optional
 from app.database import get_database
@@ -44,8 +44,8 @@ async def create_comment(
         "parent_comment_id": None,
         "likes": 0,
         "replies_count": 0,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
         "is_active": True
     }
     
@@ -113,8 +113,8 @@ async def reply_to_comment(
         "parent_comment_id": comment_id,
         "likes": 0,
         "replies_count": 0,  # Replies can't have replies
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
         "is_active": True
     }
     
@@ -313,7 +313,7 @@ async def like_comment(
         await db.comment_likes.insert_one({
             "comment_id": comment_id,
             "user_id": user_id,
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(timezone.utc)
         })
         await db.comments.update_one(
             {"_id": ObjectId(comment_id)},
@@ -380,7 +380,7 @@ async def delete_comment(
     # Mark comment as inactive (soft delete)
     await db.comments.update_one(
         {"_id": ObjectId(comment_id)},
-        {"$set": {"is_active": False, "updated_at": datetime.utcnow()}}
+        {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)}}
     )
     
     # Delete all likes on this comment
@@ -439,7 +439,7 @@ async def report_comment(
         "reason": report_data.reason,
         "details": report_data.details,
         "status": "pending",
-        "created_at": datetime.utcnow()
+        "created_at": datetime.now(timezone.utc)
     }
     
     result = await db.comment_reports.insert_one(report_doc)

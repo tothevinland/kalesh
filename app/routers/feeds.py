@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 from typing import Optional
 from bson import ObjectId
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from app.schemas import VideoResponse, VideoList, APIResponse
 from app.auth import get_current_user, get_current_user_optional
 from app.database import get_database
@@ -24,7 +24,7 @@ async def get_trending_videos(
     skip = (page - 1) * page_size
     
     # Get videos from last 30 days with engagement score
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     
     # Aggregate pipeline to calculate trending score
     pipeline = [

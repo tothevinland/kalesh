@@ -1,6 +1,6 @@
 import asyncio
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from bson import ObjectId
 import tempfile
 import os
@@ -28,7 +28,7 @@ class VideoProcessingQueue:
         await self.queue.put({
             'video_id': video_id,
             'raw_video_url': raw_video_url,
-            'added_at': datetime.utcnow()
+            'added_at': datetime.now(timezone.utc)
         })
         print(f"Video {video_id} added to processing queue. Queue size: {self.queue.qsize()}")
     
@@ -71,7 +71,7 @@ class VideoProcessingQueue:
             # Update status to processing
             await db.videos.update_one(
                 {"_id": ObjectId(video_id)},
-                {"$set": {"processing_status": "processing", "updated_at": datetime.utcnow()}}
+                {"$set": {"processing_status": "processing", "updated_at": datetime.now(timezone.utc)}}
             )
             
             # Download raw video to temp file
@@ -117,7 +117,7 @@ class VideoProcessingQueue:
                     "thumbnail_url": thumbnail_url,
                     "duration": duration,
                     "processing_status": "completed",
-                    "updated_at": datetime.utcnow()
+                    "updated_at": datetime.now(timezone.utc)
                 }}
             )
             
@@ -136,7 +136,7 @@ class VideoProcessingQueue:
                 {"$set": {
                     "processing_status": "failed",
                     "processing_error": str(e),
-                    "updated_at": datetime.utcnow()
+                    "updated_at": datetime.now(timezone.utc)
                 }}
             )
             

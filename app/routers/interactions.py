@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from bson import ObjectId
-from datetime import datetime
+from datetime import datetime, timezone
 from app.schemas import InteractionResponse, ReportCreate, APIResponse
 from app.auth import get_current_user
 from app.database import get_database
@@ -79,7 +79,7 @@ async def like_video(
             "user_id": user_id,
             "video_id": video_id,
             "interaction_type": "like",
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(timezone.utc)
         })
         await db.videos.update_one(
             {"_id": ObjectId(video_id)},
@@ -169,7 +169,7 @@ async def dislike_video(
             "user_id": user_id,
             "video_id": video_id,
             "interaction_type": "dislike",
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(timezone.utc)
         })
         await db.videos.update_one(
             {"_id": ObjectId(video_id)},
@@ -245,7 +245,7 @@ async def save_video(
             "user_id": user_id,
             "video_id": video_id,
             "interaction_type": "save",
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(timezone.utc)
         })
         await db.videos.update_one(
             {"_id": ObjectId(video_id)},
@@ -310,7 +310,7 @@ async def report_video(
         "reason": report_data.reason,
         "details": report_data.details,
         "status": "pending",
-        "created_at": datetime.utcnow()
+        "created_at": datetime.now(timezone.utc)
     }
     
     result = await db.reports.insert_one(report_doc)

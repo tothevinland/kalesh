@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status, Depends, UploadFile, File, Form
 from typing import Optional, List
 from bson import ObjectId
-from datetime import datetime
+from datetime import datetime, timezone
 import tempfile
 import os
 from app.schemas import VideoUpload, VideoResponse, APIResponse
@@ -54,7 +54,7 @@ async def upload_video(
             tags_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
         
         # Upload RAW video to R2 first (for queue processing later)
-        raw_video_filename = f"raw_{datetime.utcnow().timestamp()}_{video.filename}"
+        raw_video_filename = f"raw_{datetime.now(timezone.utc).timestamp()}_{video.filename}"
         raw_video_url = await r2_storage.upload_file(
             video_content,
             raw_video_filename,
@@ -78,8 +78,8 @@ async def upload_video(
             "dislikes": 0,
             "saved_count": 0,
             "processing_status": "pending",
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow(),
+            "created_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc),
             "is_active": True
         }
         
@@ -331,7 +331,7 @@ async def delete_video(
     # Mark as inactive (soft delete)
     await db.videos.update_one(
         {"_id": ObjectId(video_id)},
-        {"$set": {"is_active": False, "updated_at": datetime.utcnow()}}
+        {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)}}
     )
     
     # Delete all interactions

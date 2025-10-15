@@ -36,8 +36,8 @@ async def register_user(user_data: UserRegister):
         "is_active": True
     }
     
-    from datetime import datetime
-    user_dict["created_at"] = datetime.utcnow()
+    from datetime import datetime, timezone
+    user_dict["created_at"] = datetime.now(timezone.utc)
     
     result = await db.users.insert_one(user_dict)
     

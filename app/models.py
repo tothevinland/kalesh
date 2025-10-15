@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Any
 from pydantic import BaseModel, Field, EmailStr, ConfigDict, field_serializer
 from pydantic_core import core_schema
@@ -47,7 +47,7 @@ class UserInDB(BaseModel):
     full_name: Optional[str] = None
     bio: Optional[str] = None
     profile_image_url: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_active: bool = True
 
 
@@ -74,8 +74,8 @@ class VideoInDB(BaseModel):
     likes: int = 0
     dislikes: int = 0
     saved_count: int = 0
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_active: bool = True
 
 
@@ -91,7 +91,7 @@ class InteractionInDB(BaseModel):
     user_id: str
     video_id: str
     interaction_type: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class ReportInDB(BaseModel):
@@ -108,7 +108,7 @@ class ReportInDB(BaseModel):
     reason: str
     details: Optional[str] = None
     status: str = "pending"
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class CommentInDB(BaseModel):
@@ -127,8 +127,8 @@ class CommentInDB(BaseModel):
     parent_comment_id: Optional[str] = None  # For replies
     likes: int = 0
     replies_count: int = 0  # Only for top-level comments
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_active: bool = True
 
 
@@ -143,7 +143,7 @@ class CommentLikeInDB(BaseModel):
     id: Optional[PyObjectId] = Field(default=None, alias="_id")
     comment_id: str
     user_id: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class CommentReportInDB(BaseModel):
@@ -160,5 +160,5 @@ class CommentReportInDB(BaseModel):
     reason: str
     details: Optional[str] = None
     status: str = "pending"
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
