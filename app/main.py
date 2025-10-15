@@ -17,10 +17,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Kalesh.me API",
-    description="Video sharing platform backend API",
-    version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    docs_url=None,
+    redoc_url=None
 )
 
 # CORS middleware
@@ -57,11 +56,7 @@ app.include_router(comments.router)
 
 @app.get("/")
 async def root():
-    return {
-        "status": "success",
-        "message": "Welcome to Kalesh.me API",
-        "version": "1.0.0"
-    }
+    return "works :)"
 
 
 @app.get("/health")
