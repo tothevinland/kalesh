@@ -91,7 +91,7 @@ async def get_trending_videos(
             "$skip": skip
         },
         {
-            "$limit": fetch_size
+            "$limit": max(1, fetch_size)  # Ensure limit is at least 1
         },
         # Add a random sample stage to select a subset of the top trending videos
         {
@@ -100,7 +100,7 @@ async def get_trending_videos(
     ]
     
     videos_cursor = db.videos.aggregate(pipeline)
-    videos = await videos_cursor.to_list(length=page_size)
+    videos = await videos_cursor.to_list(length=max(1, page_size))
     
     # Get total count - don't exclude viewed videos from total count to ensure pagination works correctly
     total = await db.videos.count_documents({
@@ -150,7 +150,7 @@ async def get_trending_videos(
                 "$skip": skip
             },
             {
-                "$limit": additional_needed
+                "$limit": max(1, additional_needed)  # Ensure limit is at least 1
             },
             {
                 "$sample": {"size": max(1, additional_needed)}  # Ensure sample size is at least 1
@@ -158,7 +158,7 @@ async def get_trending_videos(
         ]
         
         fallback_cursor = db.videos.aggregate(fallback_pipeline)
-        additional_videos = await fallback_cursor.to_list(length=additional_needed)
+        additional_videos = await fallback_cursor.to_list(length=max(1, additional_needed))
         videos.extend(additional_videos)
     
     # Format videos with user interactions if authenticated
@@ -287,7 +287,7 @@ async def get_recent_videos(
             "$skip": skip
         },
         {
-            "$limit": fetch_size
+            "$limit": max(1, fetch_size)  # Ensure limit is at least 1
         },
         # Add a random sample stage to select a subset of the recent videos
         {
@@ -297,7 +297,7 @@ async def get_recent_videos(
     
     videos_cursor = db.videos.aggregate(pipeline)
     
-    videos = await videos_cursor.to_list(length=page_size)
+    videos = await videos_cursor.to_list(length=max(1, page_size))
     
     # Get total count - don't exclude viewed videos from total count to ensure pagination works correctly
     total = await db.videos.count_documents({
@@ -333,7 +333,7 @@ async def get_recent_videos(
                 "$skip": skip
             },
             {
-                "$limit": additional_needed
+                "$limit": max(1, additional_needed)  # Ensure limit is at least 1
             },
             {
                 "$sample": {"size": max(1, additional_needed)}  # Ensure sample size is at least 1
@@ -341,7 +341,7 @@ async def get_recent_videos(
         ]
         
         fallback_cursor = db.videos.aggregate(fallback_pipeline)
-        additional_videos = await fallback_cursor.to_list(length=additional_needed)
+        additional_videos = await fallback_cursor.to_list(length=max(1, additional_needed))
         videos.extend(additional_videos)
     
     # Format videos with user interactions if authenticated
@@ -570,7 +570,7 @@ async def discover_videos(
             "$sort": {"trending_score": -1}
         },
         {
-            "$limit": trending_count * 5  # Get more than needed for randomization
+            "$limit": max(1, trending_count * 5)  # Get more than needed for randomization, ensure at least 1
         },
         {
             "$sample": {"size": max(1, trending_count)}  # Ensure sample size is at least 1
@@ -578,7 +578,7 @@ async def discover_videos(
     ]
     
     trending_cursor = db.videos.aggregate(trending_pipeline)
-    trending_videos = await trending_cursor.to_list(length=trending_count)
+    trending_videos = await trending_cursor.to_list(length=max(1, trending_count))
     
     # Get new videos (excluding those already in trending)
     trending_ids = [str(video["_id"]) for video in trending_videos]
@@ -599,7 +599,7 @@ async def discover_videos(
             "$sort": {"created_at": -1}
         },
         {
-            "$limit": new_count * 5  # Get more than needed for randomization
+            "$limit": max(1, new_count * 5)  # Get more than needed for randomization, ensure at least 1
         },
         {
             "$sample": {"size": max(1, new_count)}  # Ensure sample size is at least 1
@@ -607,7 +607,7 @@ async def discover_videos(
     ]
     
     new_cursor = db.videos.aggregate(new_pipeline)
-    new_videos = await new_cursor.to_list(length=new_count)
+    new_videos = await new_cursor.to_list(length=max(1, new_count))
     
     # Combine videos and shuffle
     videos = trending_videos + new_videos
@@ -635,8 +635,8 @@ async def discover_videos(
             fallback_match["_id"] = {"$nin": existing_ids}
         
         # Simple fallback query to get any remaining videos needed
-        fallback_cursor = db.videos.find(fallback_match).sort("created_at", -1).limit(needed_count)
-        fallback_videos = await fallback_cursor.to_list(length=needed_count)
+        fallback_cursor = db.videos.find(fallback_match).sort("created_at", -1).limit(max(1, needed_count))
+        fallback_videos = await fallback_cursor.to_list(length=max(1, needed_count))
         
         # Add fallback videos to our result set
         videos.extend(fallback_videos)
@@ -748,7 +748,7 @@ async def search_videos(
         ("created_at", -1)
     ]).skip(skip).limit(page_size)
     
-    videos = await videos_cursor.to_list(length=page_size)
+    videos = await videos_cursor.to_list(length=max(1, page_size))
     
     # Get total count
     total = await db.videos.count_documents(search_query)
@@ -877,7 +877,7 @@ async def get_user_videos(
         "processing_status": "completed"
     }).sort("created_at", -1).skip(skip).limit(page_size)
     
-    videos = await videos_cursor.to_list(length=page_size)
+    videos = await videos_cursor.to_list(length=max(1, page_size))
     
     # Get total count
     total = await db.videos.count_documents({
