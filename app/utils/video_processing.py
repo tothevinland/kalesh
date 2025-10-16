@@ -4,17 +4,43 @@ import os
 import shutil
 from typing import Tuple, Optional, Dict, List
 from pathlib import Path
+from app.config import settings
 
 
 class VideoProcessor:
-    
-    # Quality presets for HLS streaming
-    QUALITIES = {
-        '1080p': {'width': 1920, 'height': 1080, 'bitrate': '5000k', 'audio_bitrate': '192k'},
-        '720p': {'width': 1280, 'height': 720, 'bitrate': '2800k', 'audio_bitrate': '128k'},
-        '480p': {'width': 854, 'height': 480, 'bitrate': '1400k', 'audio_bitrate': '128k'},
-        '360p': {'width': 640, 'height': 360, 'bitrate': '800k', 'audio_bitrate': '96k'},
-    }
+    # Quality presets are now loaded from config settings
+    @staticmethod
+    def get_qualities():
+        return {
+            '1080p': {
+                'width': 1920, 
+                'height': 1080, 
+                'bitrate': settings.VIDEO_BITRATE_1080P, 
+                'audio_bitrate': '128k', 
+                'crf': settings.VIDEO_CRF_1080P
+            },
+            '720p': {
+                'width': 1280, 
+                'height': 720, 
+                'bitrate': settings.VIDEO_BITRATE_720P, 
+                'audio_bitrate': '96k', 
+                'crf': settings.VIDEO_CRF_720P
+            },
+            '480p': {
+                'width': 854, 
+                'height': 480, 
+                'bitrate': settings.VIDEO_BITRATE_480P, 
+                'audio_bitrate': '96k', 
+                'crf': settings.VIDEO_CRF_480P
+            },
+            '360p': {
+                'width': 640, 
+                'height': 360, 
+                'bitrate': settings.VIDEO_BITRATE_360P, 
+                'audio_bitrate': '64k', 
+                'crf': settings.VIDEO_CRF_360P
+            },
+        }
     
     @staticmethod
     async def process_video_to_hls(video_path: str) -> Tuple[Optional[float], Optional[bytes], Optional[Dict]]:
@@ -55,15 +81,18 @@ class VideoProcessor:
             # Get video resolution to determine available qualities
             video_height = await VideoProcessor.get_video_height(video_path)
             
+            # Get qualities from config
+            qualities = VideoProcessor.get_qualities()
+            
             # Filter qualities based on source resolution
             available_qualities = {}
-            for quality, settings in VideoProcessor.QUALITIES.items():
+            for quality, settings in qualities.items():
                 if video_height and video_height >= settings['height']:
                     available_qualities[quality] = settings
             
             # If no qualities available, use original resolution
             if not available_qualities:
-                available_qualities = {'360p': VideoProcessor.QUALITIES['360p']}
+                available_qualities = {'360p': qualities['360p']}
             
             # Generate HLS for each quality
             master_playlist_lines = ['#EXTM3U', '#EXT-X-VERSION:3']
@@ -74,23 +103,102 @@ class VideoProcessor:
                 
                 output_path = os.path.join(quality_dir, 'playlist.m3u8')
                 
-                # FFmpeg command for HLS
-                cmd = [
-                    '/usr/bin/ffmpeg',
+                # FFmpeg command for HLS with improved compression
+                # Check if we should use two-pass encoding
+                if settings.USE_TWO_PASS_ENCODING:
+                    # First pass - analyze video
+                    first_pass_log = os.path.join(quality_dir, 'ffmpeg2pass')
+                    first_pass_cmd = [
+                        '/usr/bin/ffmpeg',
+                    '-y',
                     '-i', video_path,
                     '-vf', f"scale={settings['width']}:{settings['height']}:force_original_aspect_ratio=decrease",
                     '-c:v', 'libx264',
                     '-b:v', settings['bitrate'],
-                    '-c:a', 'aac',
-                    '-b:a', settings['audio_bitrate'],
-                    '-hls_time', '6',
-                    '-hls_playlist_type', 'vod',
-                    '-hls_segment_filename', os.path.join(quality_dir, 'segment_%03d.ts'),
-                    '-f', 'hls',
-                    output_path
+                    '-maxrate', f"{int(float(settings['bitrate'].replace('k', '')) * 1.5)}k",
+                    '-bufsize', f"{int(float(settings['bitrate'].replace('k', '')) * 2)}k",
+                    '-crf', str(settings['crf']),
+                    '-preset', settings.VIDEO_COMPRESSION_PRESET,
+                    '-x264opts', 'keyint=48:min-keyint=48:no-scenecut',
+                    '-an',  # No audio in first pass
+                    '-f', 'null',
+                    '-pass', '1',
+                    '-passlogfile', first_pass_log,
+                    '/dev/null'
                 ]
                 
-                result = subprocess.run(cmd, capture_output=True, timeout=300)
+                    # Run first pass
+                    first_pass_result = subprocess.run(first_pass_cmd, capture_output=True, timeout=300)
+                    
+                    if first_pass_result.returncode == 0:
+                        # Second pass - encode with knowledge from first pass
+                        cmd = [
+                            '/usr/bin/ffmpeg',
+                        '-i', video_path,
+                        '-vf', f"scale={settings['width']}:{settings['height']}:force_original_aspect_ratio=decrease",
+                        '-c:v', 'libx264',
+                        '-b:v', settings['bitrate'],
+                        '-maxrate', f"{int(float(settings['bitrate'].replace('k', '')) * 1.5)}k",
+                        '-bufsize', f"{int(float(settings['bitrate'].replace('k', '')) * 2)}k",
+                        '-crf', str(settings['crf']),
+                        '-preset', settings.VIDEO_COMPRESSION_PRESET,
+                        '-x264opts', 'keyint=48:min-keyint=48:no-scenecut',
+                        '-c:a', 'aac',
+                        '-b:a', settings['audio_bitrate'],
+                        '-ac', '2',  # Stereo audio
+                        '-ar', '44100',  # Audio sample rate
+                        '-hls_time', '6',
+                        '-hls_playlist_type', 'vod',
+                        '-hls_segment_filename', os.path.join(quality_dir, 'segment_%03d.ts'),
+                        '-f', 'hls',
+                        output_path
+                    ]
+                    
+                        result = subprocess.run(cmd, capture_output=True, timeout=600)  # Longer timeout for better compression
+                    else:
+                        # If first pass fails, fall back to single-pass encoding
+                        cmd = [
+                            '/usr/bin/ffmpeg',
+                        '-i', video_path,
+                        '-vf', f"scale={settings['width']}:{settings['height']}:force_original_aspect_ratio=decrease",
+                        '-c:v', 'libx264',
+                        '-b:v', settings['bitrate'],
+                        '-crf', str(settings['crf']),
+                        '-preset', 'medium',  # Fallback preset
+                        '-c:a', 'aac',
+                        '-b:a', settings['audio_bitrate'],
+                        '-hls_time', '6',
+                        '-hls_playlist_type', 'vod',
+                        '-hls_segment_filename', os.path.join(quality_dir, 'segment_%03d.ts'),
+                        '-f', 'hls',
+                        output_path
+                    ]
+                    
+                        result = subprocess.run(cmd, capture_output=True, timeout=300)
+                else:
+                    # Single-pass encoding if two-pass is disabled
+                    cmd = [
+                        '/usr/bin/ffmpeg',
+                        '-i', video_path,
+                        '-vf', f"scale={settings['width']}:{settings['height']}:force_original_aspect_ratio=decrease",
+                        '-c:v', 'libx264',
+                        '-b:v', settings['bitrate'],
+                        '-maxrate', f"{int(float(settings['bitrate'].replace('k', '')) * 1.5)}k",
+                        '-bufsize', f"{int(float(settings['bitrate'].replace('k', '')) * 2)}k",
+                        '-crf', str(settings['crf']),
+                        '-preset', settings.VIDEO_COMPRESSION_PRESET,
+                        '-c:a', 'aac',
+                        '-b:a', settings['audio_bitrate'],
+                        '-ac', '2',  # Stereo audio
+                        '-ar', '44100',  # Audio sample rate
+                        '-hls_time', '6',
+                        '-hls_playlist_type', 'vod',
+                        '-hls_segment_filename', os.path.join(quality_dir, 'segment_%03d.ts'),
+                        '-f', 'hls',
+                        output_path
+                    ]
+                    
+                    result = subprocess.run(cmd, capture_output=True, timeout=300)
                 
                 if result.returncode == 0:
                     # Read playlist

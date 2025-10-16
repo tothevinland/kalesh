@@ -23,6 +23,18 @@ class Settings(BaseSettings):
     MAX_VIDEO_SIZE_MB: int = 200
     ALLOWED_VIDEO_TYPES: str = "video/mp4,video/mpeg,video/quicktime,video/x-msvideo,video/webm"
     
+    # Video Compression Settings
+    VIDEO_COMPRESSION_PRESET: str = "slow"  # ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow
+    VIDEO_CRF_1080P: int = 23
+    VIDEO_CRF_720P: int = 24
+    VIDEO_CRF_480P: int = 25
+    VIDEO_CRF_360P: int = 26
+    VIDEO_BITRATE_1080P: str = "3500k"
+    VIDEO_BITRATE_720P: str = "1800k"
+    VIDEO_BITRATE_480P: str = "900k"
+    VIDEO_BITRATE_360P: str = "500k"
+    USE_TWO_PASS_ENCODING: bool = True
+    
     @property
     def allowed_video_types_list(self) -> List[str]:
         return [t.strip() for t in self.ALLOWED_VIDEO_TYPES.split(",")]

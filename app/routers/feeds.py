@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, status, Depends, Query
-from typing import Optional
+from typing import Optional, List
 from bson import ObjectId
 from datetime import datetime, timezone, timedelta
 from app.schemas import VideoResponse, VideoList, APIResponse
@@ -684,6 +684,139 @@ async def discover_videos(
             "total": total,
             "page": page,
             "page_size": page_size
+        }
+    )
+
+
+@router.get("/search", response_model=APIResponse)
+async def search_videos(
+    query: str = Query(..., min_length=1, description="Search query for video titles and descriptions"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=50),
+    include_users: bool = Query(True, description="Whether to include users in search results"),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """
+    Search for videos by title and description, and optionally users by username
+    Uses MongoDB text search for efficient querying
+    """
+    db = get_database()
+    
+    # Calculate skip for pagination
+    skip = (page - 1) * page_size
+    
+    # Create the search query
+    search_query = {
+        "$text": {"$search": query},
+        "is_active": True,
+        "processing_status": "completed"
+    }
+    
+    # Get videos matching the search query
+    videos_cursor = db.videos.find(
+        search_query,
+        # Add text score for sorting by relevance
+        {"score": {"$meta": "textScore"}}
+    ).sort([
+        # Sort by text match score first
+        ("score", {"$meta": "textScore"}),
+        # Then by recency as secondary sort
+        ("created_at", -1)
+    ]).skip(skip).limit(page_size)
+    
+    videos = await videos_cursor.to_list(length=page_size)
+    
+    # Get total count
+    total = await db.videos.count_documents(search_query)
+    
+    # Format videos with user interactions if authenticated
+    video_list = []
+    for video in videos:
+        user_interaction = None
+        if current_user:
+            user_id = str(current_user["_id"])
+            video_id = str(video["_id"])
+            
+            like = await db.interactions.find_one({
+                "user_id": user_id,
+                "video_id": video_id,
+                "interaction_type": "like"
+            })
+            dislike = await db.interactions.find_one({
+                "user_id": user_id,
+                "video_id": video_id,
+                "interaction_type": "dislike"
+            })
+            save = await db.interactions.find_one({
+                "user_id": user_id,
+                "video_id": video_id,
+                "interaction_type": "save"
+            })
+            
+            user_interaction = {
+                "liked": like is not None,
+                "disliked": dislike is not None,
+                "saved": save is not None
+            }
+        
+        video_response = VideoResponse(
+            id=str(video["_id"]),
+            uploader_id=video["uploader_id"],
+            uploader_username=video["uploader_username"],
+            uploader_profile_image_url=video.get("uploader_profile_image_url"),
+            title=video["title"],
+            description=video.get("description"),
+            tags=video.get("tags", []),
+            playlist_url=video["playlist_url"],
+            thumbnail_url=video.get("thumbnail_url"),
+            duration=video.get("duration"),
+            views=video["views"],
+            likes=video["likes"],
+            dislikes=video["dislikes"],
+            saved_count=video["saved_count"],
+            processing_status=video.get("processing_status", "completed"),
+            created_at=video["created_at"],
+            user_interaction=user_interaction
+        )
+        video_list.append(video_response.model_dump())
+    
+    # Search for users if requested
+    users_list = []
+    users_total = 0
+    
+    if include_users:
+        # Create regex for case-insensitive username search
+        regex_pattern = f".*{query}.*"
+        users_cursor = db.users.find(
+            {
+                "username": {"$regex": regex_pattern, "$options": "i"},
+                "is_active": True
+            }
+        ).limit(10)  # Limit to top 10 user matches
+        
+        users = await users_cursor.to_list(length=10)
+        users_total = len(users)
+        
+        # Format user results
+        for user in users:
+            users_list.append({
+                "id": str(user["_id"]),
+                "username": user["username"],
+                "full_name": user.get("full_name"),
+                "profile_image_url": user.get("profile_image_url")
+            })
+    
+    return APIResponse(
+        status="success",
+        message=f"Search results for '{query}'",
+        data={
+            "videos": video_list,
+            "users": users_list,
+            "total_videos": total,
+            "total_users": users_total,
+            "page": page,
+            "page_size": page_size,
+            "query": query
         }
     )
 
