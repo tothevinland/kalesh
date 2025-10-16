@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from app.schemas import InteractionResponse, ReportCreate, APIResponse
 from app.auth import get_current_user
 from app.database import get_database
+from app.utils.datetime_helper import format_datetime_response
 
 router = APIRouter(prefix="/interactions", tags=["interactions"])
 

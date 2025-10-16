@@ -6,6 +6,7 @@ from app.schemas import VideoResponse, VideoList, APIResponse
 from app.auth import get_current_user, get_current_user_optional
 from app.database import get_database
 from app.models import NSFWPreference
+from app.utils.datetime_helper import format_datetime_response
 
 import random
 
@@ -216,7 +217,7 @@ async def get_trending_videos(
             dislikes=video["dislikes"],
             saved_count=video["saved_count"],
             processing_status=video.get("processing_status", "completed"),
-            created_at=video["created_at"],
+            created_at=format_datetime_response(video["created_at"]),
             user_interaction=user_interaction
         )
         video_list.append(video_response.model_dump())
@@ -414,7 +415,7 @@ async def get_recent_videos(
             dislikes=video["dislikes"],
             saved_count=video["saved_count"],
             processing_status=video.get("processing_status", "completed"),
-            created_at=video["created_at"],
+            created_at=format_datetime_response(video["created_at"]),
             user_interaction=user_interaction
         )
         video_list.append(video_response.model_dump())
@@ -510,7 +511,7 @@ async def get_saved_videos(
                 likes=video["likes"],
                 dislikes=video["dislikes"],
                 saved_count=video["saved_count"],
-                created_at=video["created_at"],
+                created_at=format_datetime_response(video["created_at"]),
                 user_interaction=user_interaction
             )
             video_list.append(video_response.model_dump())
@@ -711,7 +712,7 @@ async def discover_videos(
             dislikes=video["dislikes"],
             saved_count=video["saved_count"],
             processing_status=video.get("processing_status", "completed"),
-            created_at=video["created_at"],
+            created_at=format_datetime_response(video["created_at"]),
             user_interaction=user_interaction
         )
         video_list.append(video_response.model_dump())
@@ -835,7 +836,7 @@ async def search_videos(
             dislikes=video["dislikes"],
             saved_count=video["saved_count"],
             processing_status=video.get("processing_status", "completed"),
-            created_at=video["created_at"],
+            created_at=format_datetime_response(video["created_at"]),
             user_interaction=user_interaction
         )
         video_list.append(video_response.model_dump())
@@ -967,7 +968,7 @@ async def get_user_videos(
             dislikes=video["dislikes"],
             saved_count=video["saved_count"],
             processing_status=video.get("processing_status", "completed"),
-            created_at=video["created_at"],
+            created_at=format_datetime_response(video["created_at"]),
             user_interaction=user_interaction
         )
         video_list.append(video_response.model_dump())

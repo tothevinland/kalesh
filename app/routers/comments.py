@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from app.schemas import CommentCreate, CommentResponse, CommentWithReplies, APIResponse, ReportCreate
 from app.auth import get_current_user, get_current_user_optional
 from app.database import get_database
+from app.utils.datetime_helper import format_datetime_response
 
 router = APIRouter(prefix="/comments", tags=["comments"])
 
@@ -60,7 +61,7 @@ async def create_comment(
         parent_comment_id=None,
         likes=0,
         replies_count=0,
-        created_at=comment_doc["created_at"],
+        created_at=format_datetime_response(comment_doc["created_at"]),
         user_liked=False
     )
     
@@ -135,7 +136,7 @@ async def reply_to_comment(
         parent_comment_id=comment_id,
         likes=0,
         replies_count=0,
-        created_at=reply_doc["created_at"],
+        created_at=format_datetime_response(reply_doc["created_at"]),
         user_liked=False
     )
     
@@ -227,7 +228,7 @@ async def get_video_comments(
                 parent_comment_id=reply.get("parent_comment_id"),
                 likes=reply["likes"],
                 replies_count=0,
-                created_at=reply["created_at"],
+                created_at=format_datetime_response(reply["created_at"]),
                 user_liked=reply_user_liked
             )
             replies_list.append(reply_response.model_dump())
@@ -240,7 +241,7 @@ async def get_video_comments(
             text=comment["text"],
             likes=comment["likes"],
             replies_count=comment["replies_count"],
-            created_at=comment["created_at"],
+            created_at=format_datetime_response(comment["created_at"]),
             user_liked=user_liked,
             replies=replies_list
         )

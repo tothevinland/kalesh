@@ -7,6 +7,7 @@ from app.database import get_database
 from app.config import settings
 from app.utils.storage import r2_storage
 from app.models import NSFWPreference
+from app.utils.datetime_helper import format_datetime_response
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -130,7 +131,7 @@ async def get_user_profile(current_user: dict = Depends(get_current_user)):
         full_name=current_user.get("full_name"),
         bio=current_user.get("bio"),
         profile_image_url=current_user.get("profile_image_url"),
-        created_at=current_user["created_at"],
+        created_at=format_datetime_response(current_user["created_at"]),
         show_nsfw=show_nsfw_value
     )
     
@@ -162,7 +163,7 @@ async def get_user_profile_by_username(username: str):
         full_name=user.get("full_name"),
         bio=user.get("bio"),
         profile_image_url=user.get("profile_image_url"),
-        created_at=user["created_at"]
+        created_at=format_datetime_response(user["created_at"])
     )
     
     return APIResponse(
@@ -214,7 +215,7 @@ async def update_user_profile(
         full_name=updated_user.get("full_name"),
         bio=updated_user.get("bio"),
         profile_image_url=updated_user.get("profile_image_url"),
-        created_at=updated_user["created_at"]
+        created_at=format_datetime_response(updated_user["created_at"])
     )
     
     return APIResponse(

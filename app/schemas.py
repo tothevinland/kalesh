@@ -1,11 +1,17 @@
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 import re
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from app.models import NSFWPreference
 
 
 # Response Models
+class DateTimeResponse(BaseModel):
+    """Schema for datetime responses with timezone information"""
+    iso: str  # ISO 8601 format with timezone
+    timestamp: float  # Unix timestamp in seconds
+    timezone: str  # UTC offset string
+
 class APIResponse(BaseModel):
     status: str
     message: str
@@ -38,7 +44,7 @@ class UserProfile(BaseModel):
     full_name: Optional[str] = None
     bio: Optional[str] = None
     profile_image_url: Optional[str] = None
-    created_at: datetime
+    created_at: DateTimeResponse
     show_nsfw: NSFWPreference = NSFWPreference.ASK
 
 
@@ -131,7 +137,7 @@ class VideoResponse(BaseModel):
     dislikes: int = 0
     saved_count: int = 0
     processing_status: str = "completed"  # pending, processing, completed, failed
-    created_at: datetime
+    created_at: DateTimeResponse
     user_interaction: Optional[dict] = None  # {"liked": bool, "disliked": bool, "saved": bool}
     is_nsfw: bool = False
 
@@ -170,7 +176,7 @@ class CommentResponse(BaseModel):
     parent_comment_id: Optional[str] = None
     likes: int = 0
     replies_count: int = 0
-    created_at: datetime
+    created_at: DateTimeResponse
     user_liked: bool = False  # Whether current user liked this comment
 
 
@@ -182,7 +188,7 @@ class CommentWithReplies(BaseModel):
     text: str
     likes: int = 0
     replies_count: int = 0
-    created_at: datetime
+    created_at: DateTimeResponse
     user_liked: bool = False
     replies: List[CommentResponse] = Field(default_factory=list)
 

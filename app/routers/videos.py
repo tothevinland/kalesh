@@ -12,6 +12,7 @@ from app.utils.storage import r2_storage
 from app.utils.video_processing import video_processor
 from app.utils.video_queue import video_queue
 from app.config import settings
+from app.utils.datetime_helper import format_datetime_response
 
 router = APIRouter(prefix="/videos", tags=["videos"])
 
@@ -325,7 +326,7 @@ async def get_video(
         dislikes=video["dislikes"],
         saved_count=video["saved_count"],
         processing_status=video.get("processing_status", "completed"),
-        created_at=video["created_at"],
+        created_at=format_datetime_response(video["created_at"]),
         user_interaction=user_interaction,
         is_nsfw=video.get("is_nsfw", False)
     )

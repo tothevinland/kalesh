@@ -5,6 +5,7 @@ from bson import ObjectId
 from app.schemas import APIResponse
 from app.auth import get_current_user, get_current_user_optional
 from app.database import get_database
+from app.utils.datetime_helper import format_datetime_response
 
 router = APIRouter(prefix="/tags", tags=["tags"])
 
@@ -208,7 +209,7 @@ async def explore_by_tag(
             "dislikes": video["dislikes"],
             "saved_count": video["saved_count"],
             "processing_status": video.get("processing_status", "completed"),
-            "created_at": video["created_at"],
+            "created_at": format_datetime_response(video["created_at"]),
             "user_interaction": user_interaction
         })
     
