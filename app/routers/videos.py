@@ -20,6 +20,7 @@ async def upload_video(
     title: str = Form(...),
     description: Optional[str] = Form(None),
     tags: Optional[str] = Form(None),  # Comma-separated tags
+    is_nsfw: bool = Form(False),  # Flag for NSFW content
     video: UploadFile = File(...),
     current_user: dict = Depends(get_current_user)
 ):
@@ -80,7 +81,8 @@ async def upload_video(
             "processing_status": "pending",
             "created_at": datetime.now(timezone.utc),
             "updated_at": datetime.now(timezone.utc),
-            "is_active": True
+            "is_active": True,
+            "is_nsfw": is_nsfw
         }
         
         result = await db.videos.insert_one(video_doc)
@@ -106,7 +108,8 @@ async def upload_video(
             dislikes=video_doc["dislikes"],
             saved_count=video_doc["saved_count"],
             processing_status=video_doc["processing_status"],
-            created_at=video_doc["created_at"]
+            created_at=video_doc["created_at"],
+            is_nsfw=video_doc["is_nsfw"]
         )
         
         return APIResponse(
@@ -309,7 +312,8 @@ async def get_video(
         saved_count=video["saved_count"],
         processing_status=video.get("processing_status", "completed"),
         created_at=video["created_at"],
-        user_interaction=user_interaction
+        user_interaction=user_interaction,
+        is_nsfw=video.get("is_nsfw", False)
     )
     
     return APIResponse(

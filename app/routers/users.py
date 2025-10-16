@@ -33,7 +33,8 @@ async def register_user(user_data: UserRegister):
         "full_name": None,
         "bio": None,
         "profile_image_url": None,
-        "is_active": True
+        "is_active": True,
+        "show_nsfw": True  # Default to showing NSFW content
     }
     
     from datetime import datetime, timezone
@@ -122,7 +123,8 @@ async def get_user_profile(current_user: dict = Depends(get_current_user)):
         full_name=current_user.get("full_name"),
         bio=current_user.get("bio"),
         profile_image_url=current_user.get("profile_image_url"),
-        created_at=current_user["created_at"]
+        created_at=current_user["created_at"],
+        show_nsfw=current_user.get("show_nsfw", False)
     )
     
     return APIResponse(
@@ -181,6 +183,8 @@ async def update_user_profile(
         update_fields["full_name"] = profile_data.full_name
     if profile_data.bio is not None:
         update_fields["bio"] = profile_data.bio
+    if profile_data.show_nsfw is not None:
+        update_fields["show_nsfw"] = profile_data.show_nsfw
     
     # If no fields to update, return current profile
     if not update_fields:

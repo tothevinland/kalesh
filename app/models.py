@@ -49,6 +49,7 @@ class UserInDB(BaseModel):
     profile_image_url: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_active: bool = True
+    show_nsfw: bool = True  # User preference to show NSFW content (default: show)
 
 
 class VideoInDB(BaseModel):
@@ -77,6 +78,7 @@ class VideoInDB(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_active: bool = True
+    is_nsfw: bool = False  # Flag for NSFW content
 
 
 class InteractionInDB(BaseModel):

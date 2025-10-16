@@ -29,12 +29,14 @@ class UserProfile(BaseModel):
     bio: Optional[str] = None
     profile_image_url: Optional[str] = None
     created_at: datetime
+    show_nsfw: bool = True
 
 
 class UserProfileUpdate(BaseModel):
     email: Optional[str] = None
     full_name: Optional[str] = Field(None, max_length=100)
     bio: Optional[str] = Field(None, max_length=500)
+    show_nsfw: Optional[bool] = None
 
 
 class Token(BaseModel):
@@ -57,6 +59,7 @@ class VideoUpload(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = Field(None, max_length=5000)
     tags: Optional[List[str]] = Field(default_factory=list, max_items=10)
+    is_nsfw: bool = False
 
 
 class VideoResponse(BaseModel):
@@ -77,6 +80,7 @@ class VideoResponse(BaseModel):
     processing_status: str = "completed"  # pending, processing, completed, failed
     created_at: datetime
     user_interaction: Optional[dict] = None  # {"liked": bool, "disliked": bool, "saved": bool}
+    is_nsfw: bool = False
 
 
 class VideoList(BaseModel):

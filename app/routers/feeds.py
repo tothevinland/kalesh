@@ -54,6 +54,14 @@ async def get_trending_videos(
         "created_at": {"$gte": thirty_days_ago}
     }
     
+    # Filter NSFW content based on user preference
+    show_nsfw = True  # Default to showing NSFW content
+    if current_user:
+        show_nsfw = current_user.get("show_nsfw", True)
+    
+    if not show_nsfw:
+        match_condition["$or"] = [{"is_nsfw": False}, {"is_nsfw": {"$exists": False}}]
+    
     # Add exclusion filter if we have videos to exclude
     if excluded_video_ids:
         match_condition["_id"] = {"$nin": excluded_video_ids}
@@ -254,6 +262,14 @@ async def get_recent_videos(
         "is_active": True, 
         "processing_status": "completed"
     }
+    
+    # Filter NSFW content based on user preference
+    show_nsfw = True  # Default to showing NSFW content
+    if current_user:
+        show_nsfw = current_user.get("show_nsfw", True)
+    
+    if not show_nsfw:
+        match_condition["$or"] = [{"is_nsfw": False}, {"is_nsfw": {"$exists": False}}]
     
     # Add exclusion filter if we have videos to exclude
     if excluded_video_ids:
@@ -711,6 +727,14 @@ async def search_videos(
         "is_active": True,
         "processing_status": "completed"
     }
+    
+    # Filter NSFW content based on user preference
+    show_nsfw = False
+    if current_user:
+        show_nsfw = current_user.get("show_nsfw", False)
+    
+    if not show_nsfw:
+        search_query["$or"] = [{"is_nsfw": False}, {"is_nsfw": {"$exists": False}}]
     
     # Get videos matching the search query
     videos_cursor = db.videos.find(
