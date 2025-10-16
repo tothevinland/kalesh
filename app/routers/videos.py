@@ -4,6 +4,7 @@ from bson import ObjectId
 from datetime import datetime, timezone, timedelta
 import tempfile
 import os
+import re
 from app.schemas import VideoUpload, VideoResponse, APIResponse
 from app.auth import get_current_user, get_current_user_optional
 from app.database import get_database
@@ -49,10 +50,17 @@ async def upload_video(
         )
     
     try:
-        # Parse tags
+        # Parse and sanitize tags
         tags_list = []
         if tags:
-            tags_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
+            # Split by comma and sanitize each tag
+            for tag in tags.split(','):
+                tag = tag.strip()
+                if tag:
+                    # Only allow alphanumeric and some punctuation in tags
+                    clean_tag = re.sub(r'[^\w\s\-]', '', tag).strip()
+                    if clean_tag:  # Only add non-empty tags
+                        tags_list.append(clean_tag)
         
         # Upload RAW video to R2 first (for queue processing later)
         raw_video_filename = f"raw_{datetime.now(timezone.utc).timestamp()}_{video.filename}"
@@ -62,13 +70,19 @@ async def upload_video(
             video.content_type
         )
         
+        # Sanitize inputs
+        sanitized_title = re.sub(r'<[^>]*>', '', title).strip()
+        sanitized_description = None
+        if description:
+            sanitized_description = re.sub(r'<[^>]*>', '', description)
+        
         # Create video document with "pending" status
         video_doc = {
             "uploader_id": str(current_user["_id"]),
             "uploader_username": current_user["username"],
             "uploader_profile_image_url": current_user.get("profile_image_url"),
-            "title": title,
-            "description": description,
+            "title": sanitized_title,
+            "description": sanitized_description,
             "tags": tags_list,
             "playlist_url": raw_video_url,  # Store raw video URL temporarily
             "thumbnail_url": None,

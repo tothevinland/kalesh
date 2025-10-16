@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, EmailStr, Field
+import re
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from app.models import NSFWPreference
 
 
@@ -13,8 +14,16 @@ class APIResponse(BaseModel):
 
 # User Schemas
 class UserRegister(BaseModel):
-    username: str = Field(..., min_length=3, max_length=50)
+    username: str = Field(..., min_length=3, max_length=50, pattern=r'^[a-zA-Z0-9_]+$')
     password: str = Field(..., min_length=6)
+    
+    @field_validator('username')
+    @classmethod
+    def validate_username(cls, v):
+        # Only allow letters, numbers, and underscores
+        if not re.match(r'^[a-zA-Z0-9_]+$', v):
+            raise ValueError('Username can only contain letters, numbers, and underscores')
+        return v
 
 
 class UserLogin(BaseModel):
@@ -38,6 +47,22 @@ class UserProfileUpdate(BaseModel):
     full_name: Optional[str] = Field(None, max_length=100)
     bio: Optional[str] = Field(None, max_length=500)
     show_nsfw: Optional[NSFWPreference] = None
+    
+    @field_validator('full_name')
+    @classmethod
+    def sanitize_full_name(cls, v):
+        if v is None:
+            return v
+        # Remove any potentially harmful characters
+        return re.sub(r'[^\w\s\-\'\.]', '', v).strip()
+    
+    @field_validator('bio')
+    @classmethod
+    def sanitize_bio(cls, v):
+        if v is None:
+            return v
+        # Basic sanitization - allow common punctuation but remove potential script tags
+        return re.sub(r'<[^>]*>', '', v)
 
 
 class Token(BaseModel):
@@ -61,6 +86,33 @@ class VideoUpload(BaseModel):
     description: Optional[str] = Field(None, max_length=5000)
     tags: Optional[List[str]] = Field(default_factory=list, max_items=10)
     is_nsfw: bool = False
+    
+    @field_validator('title')
+    @classmethod
+    def sanitize_title(cls, v):
+        if v is None:
+            return v
+        return re.sub(r'<[^>]*>', '', v).strip()
+    
+    @field_validator('description')
+    @classmethod
+    def sanitize_description(cls, v):
+        if v is None:
+            return v
+        return re.sub(r'<[^>]*>', '', v)
+    
+    @field_validator('tags')
+    @classmethod
+    def sanitize_tags(cls, v):
+        if not v:
+            return []
+        # Sanitize each tag - only allow alphanumeric and some punctuation
+        sanitized = []
+        for tag in v:
+            clean_tag = re.sub(r'[^\w\s\-]', '', tag).strip()
+            if clean_tag:  # Only add non-empty tags
+                sanitized.append(clean_tag)
+        return sanitized
 
 
 class VideoResponse(BaseModel):

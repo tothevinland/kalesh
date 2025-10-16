@@ -58,7 +58,11 @@ async def get_trending_videos(
     # Filter NSFW content based on user preference
     nsfw_pref = NSFWPreference.ASK  # Default to ask before showing NSFW content
     if current_user:
-        nsfw_pref = current_user.get("show_nsfw", NSFWPreference.ASK)
+        show_nsfw_value = current_user.get("show_nsfw", NSFWPreference.ASK)
+        # Handle legacy boolean values
+        if isinstance(show_nsfw_value, bool):
+            show_nsfw_value = NSFWPreference.SHOW if show_nsfw_value else NSFWPreference.HIDE
+        nsfw_pref = show_nsfw_value
     
     # Add NSFW filtering based on preference
     if nsfw_pref == NSFWPreference.HIDE:
@@ -271,7 +275,11 @@ async def get_recent_videos(
     # Filter NSFW content based on user preference
     nsfw_pref = NSFWPreference.ASK  # Default to ask before showing NSFW content
     if current_user:
-        nsfw_pref = current_user.get("show_nsfw", NSFWPreference.ASK)
+        show_nsfw_value = current_user.get("show_nsfw", NSFWPreference.ASK)
+        # Handle legacy boolean values
+        if isinstance(show_nsfw_value, bool):
+            show_nsfw_value = NSFWPreference.SHOW if show_nsfw_value else NSFWPreference.HIDE
+        nsfw_pref = show_nsfw_value
     
     # Add NSFW filtering based on preference
     if nsfw_pref == NSFWPreference.HIDE:
@@ -747,7 +755,11 @@ async def search_videos(
     # Filter NSFW content based on user preference
     nsfw_pref = NSFWPreference.ASK  # Default to ask before showing NSFW content
     if current_user:
-        nsfw_pref = current_user.get("show_nsfw", NSFWPreference.ASK)
+        show_nsfw_value = current_user.get("show_nsfw", NSFWPreference.ASK)
+        # Handle legacy boolean values
+        if isinstance(show_nsfw_value, bool):
+            show_nsfw_value = NSFWPreference.SHOW if show_nsfw_value else NSFWPreference.HIDE
+        nsfw_pref = show_nsfw_value
     
     # Add NSFW filtering based on preference
     if nsfw_pref == NSFWPreference.HIDE:

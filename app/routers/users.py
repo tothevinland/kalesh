@@ -117,6 +117,12 @@ async def get_user_profile(current_user: dict = Depends(get_current_user)):
     """
     Get current user's profile
     """
+    # Convert existing boolean show_nsfw to enum if needed
+    show_nsfw_value = current_user.get("show_nsfw", NSFWPreference.ASK)
+    if isinstance(show_nsfw_value, bool):
+        # Convert legacy boolean to enum
+        show_nsfw_value = NSFWPreference.SHOW if show_nsfw_value else NSFWPreference.HIDE
+    
     profile = UserProfile(
         id=str(current_user["_id"]),
         username=current_user["username"],
@@ -125,7 +131,7 @@ async def get_user_profile(current_user: dict = Depends(get_current_user)):
         bio=current_user.get("bio"),
         profile_image_url=current_user.get("profile_image_url"),
         created_at=current_user["created_at"],
-        show_nsfw=current_user.get("show_nsfw", False)
+        show_nsfw=show_nsfw_value
     )
     
     return APIResponse(
