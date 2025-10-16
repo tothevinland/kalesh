@@ -15,30 +15,30 @@ class VideoProcessor:
             '1080p': {
                 'width': 1920, 
                 'height': 1080, 
-                'bitrate': settings.VIDEO_BITRATE_1080P, 
+                'bitrate': getattr(settings, 'VIDEO_BITRATE_1080P', '3500k'), 
                 'audio_bitrate': '128k', 
                 'crf': settings.VIDEO_CRF_1080P
             },
             '720p': {
                 'width': 1280, 
                 'height': 720, 
-                'bitrate': settings.VIDEO_BITRATE_720P, 
+                'bitrate': getattr(settings, 'VIDEO_BITRATE_720P', '1800k'), 
                 'audio_bitrate': '96k', 
-                'crf': settings.VIDEO_CRF_720P
+                'crf': getattr(settings, 'VIDEO_CRF_720P', 24)
             },
             '480p': {
                 'width': 854, 
                 'height': 480, 
-                'bitrate': settings.VIDEO_BITRATE_480P, 
+                'bitrate': getattr(settings, 'VIDEO_BITRATE_480P', '900k'), 
                 'audio_bitrate': '96k', 
-                'crf': settings.VIDEO_CRF_480P
+                'crf': getattr(settings, 'VIDEO_CRF_480P', 25)
             },
             '360p': {
                 'width': 640, 
                 'height': 360, 
-                'bitrate': settings.VIDEO_BITRATE_360P, 
+                'bitrate': getattr(settings, 'VIDEO_BITRATE_360P', '500k'), 
                 'audio_bitrate': '64k', 
-                'crf': settings.VIDEO_CRF_360P
+                'crf': getattr(settings, 'VIDEO_CRF_360P', 26)
             },
         }
     
@@ -105,7 +105,8 @@ class VideoProcessor:
                 
                 # FFmpeg command for HLS with improved compression
                 # Check if we should use two-pass encoding
-                if settings.USE_TWO_PASS_ENCODING:
+                use_two_pass = getattr(settings, 'USE_TWO_PASS_ENCODING', False)
+                if use_two_pass:
                     # First pass - analyze video
                     first_pass_log = os.path.join(quality_dir, 'ffmpeg2pass')
                     first_pass_cmd = [
@@ -118,7 +119,7 @@ class VideoProcessor:
                     '-maxrate', f"{int(float(settings['bitrate'].replace('k', '')) * 1.5)}k",
                     '-bufsize', f"{int(float(settings['bitrate'].replace('k', '')) * 2)}k",
                     '-crf', str(settings['crf']),
-                    '-preset', settings.VIDEO_COMPRESSION_PRESET,
+                    '-preset', getattr(settings, 'VIDEO_COMPRESSION_PRESET', 'medium'),
                     '-x264opts', 'keyint=48:min-keyint=48:no-scenecut',
                     '-an',  # No audio in first pass
                     '-f', 'null',
@@ -141,7 +142,7 @@ class VideoProcessor:
                         '-maxrate', f"{int(float(settings['bitrate'].replace('k', '')) * 1.5)}k",
                         '-bufsize', f"{int(float(settings['bitrate'].replace('k', '')) * 2)}k",
                         '-crf', str(settings['crf']),
-                        '-preset', settings.VIDEO_COMPRESSION_PRESET,
+                        '-preset', getattr(settings, 'VIDEO_COMPRESSION_PRESET', 'medium'),
                         '-x264opts', 'keyint=48:min-keyint=48:no-scenecut',
                         '-c:a', 'aac',
                         '-b:a', settings['audio_bitrate'],
@@ -186,7 +187,7 @@ class VideoProcessor:
                         '-maxrate', f"{int(float(settings['bitrate'].replace('k', '')) * 1.5)}k",
                         '-bufsize', f"{int(float(settings['bitrate'].replace('k', '')) * 2)}k",
                         '-crf', str(settings['crf']),
-                        '-preset', settings.VIDEO_COMPRESSION_PRESET,
+                        '-preset', getattr(settings, 'VIDEO_COMPRESSION_PRESET', 'medium'),
                         '-c:a', 'aac',
                         '-b:a', settings['audio_bitrate'],
                         '-ac', '2',  # Stereo audio
