@@ -95,7 +95,7 @@ async def get_trending_videos(
         },
         # Add a random sample stage to select a subset of the top trending videos
         {
-            "$sample": {"size": page_size}
+            "$sample": {"size": max(1, page_size)}  # Ensure sample size is at least 1
         }
     ]
     
@@ -153,7 +153,7 @@ async def get_trending_videos(
                 "$limit": additional_needed
             },
             {
-                "$sample": {"size": additional_needed}
+                "$sample": {"size": max(1, additional_needed)}  # Ensure sample size is at least 1
             }
         ]
         
@@ -291,7 +291,7 @@ async def get_recent_videos(
         },
         # Add a random sample stage to select a subset of the recent videos
         {
-            "$sample": {"size": page_size}
+            "$sample": {"size": max(1, page_size)}  # Ensure sample size is at least 1
         }
     ]
     
@@ -336,7 +336,7 @@ async def get_recent_videos(
                 "$limit": additional_needed
             },
             {
-                "$sample": {"size": additional_needed}
+                "$sample": {"size": max(1, additional_needed)}  # Ensure sample size is at least 1
             }
         ]
         
@@ -573,7 +573,7 @@ async def discover_videos(
             "$limit": trending_count * 5  # Get more than needed for randomization
         },
         {
-            "$sample": {"size": trending_count}
+            "$sample": {"size": max(1, trending_count)}  # Ensure sample size is at least 1
         }
     ]
     
@@ -602,7 +602,7 @@ async def discover_videos(
             "$limit": new_count * 5  # Get more than needed for randomization
         },
         {
-            "$sample": {"size": new_count}
+            "$sample": {"size": max(1, new_count)}  # Ensure sample size is at least 1
         }
     ]
     
@@ -621,7 +621,7 @@ async def discover_videos(
     
     # If we didn't get enough videos, fetch additional ones without exclusion filters
     if len(videos) < page_size and total > 0:
-        needed_count = page_size - len(videos)
+        needed_count = max(1, page_size - len(videos))  # Ensure needed_count is at least 1
         
         # Get IDs of videos we already have to exclude them from fallback query
         existing_ids = [ObjectId(str(video["_id"])) for video in videos]
