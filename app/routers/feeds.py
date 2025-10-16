@@ -5,6 +5,7 @@ from datetime import datetime, timezone, timedelta
 from app.schemas import VideoResponse, VideoList, APIResponse
 from app.auth import get_current_user, get_current_user_optional
 from app.database import get_database
+from app.models import NSFWPreference
 
 import random
 
@@ -55,12 +56,18 @@ async def get_trending_videos(
     }
     
     # Filter NSFW content based on user preference
-    show_nsfw = True  # Default to showing NSFW content
+    nsfw_pref = NSFWPreference.ASK  # Default to ask before showing NSFW content
     if current_user:
-        show_nsfw = current_user.get("show_nsfw", True)
+        nsfw_pref = current_user.get("show_nsfw", NSFWPreference.ASK)
     
-    if not show_nsfw:
+    # Add NSFW filtering based on preference
+    if nsfw_pref == NSFWPreference.HIDE:
+        # Don't show any NSFW content
         match_condition["$or"] = [{"is_nsfw": False}, {"is_nsfw": {"$exists": False}}]
+    elif nsfw_pref == NSFWPreference.ASK:
+        # For the 'ask' option, we still return NSFW content but with a flag
+        # The frontend will handle blurring/warning based on the is_nsfw flag
+        pass  # No additional filtering needed, frontend will handle blurring
     
     # Add exclusion filter if we have videos to exclude
     if excluded_video_ids:
@@ -264,12 +271,18 @@ async def get_recent_videos(
     }
     
     # Filter NSFW content based on user preference
-    show_nsfw = True  # Default to showing NSFW content
+    nsfw_pref = NSFWPreference.ASK  # Default to ask before showing NSFW content
     if current_user:
-        show_nsfw = current_user.get("show_nsfw", True)
+        nsfw_pref = current_user.get("show_nsfw", NSFWPreference.ASK)
     
-    if not show_nsfw:
+    # Add NSFW filtering based on preference
+    if nsfw_pref == NSFWPreference.HIDE:
+        # Don't show any NSFW content
         match_condition["$or"] = [{"is_nsfw": False}, {"is_nsfw": {"$exists": False}}]
+    elif nsfw_pref == NSFWPreference.ASK:
+        # For the 'ask' option, we still return NSFW content but with a flag
+        # The frontend will handle blurring/warning based on the is_nsfw flag
+        pass  # No additional filtering needed, frontend will handle blurring
     
     # Add exclusion filter if we have videos to exclude
     if excluded_video_ids:

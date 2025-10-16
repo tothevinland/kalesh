@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, EmailStr, Field
+from app.models import NSFWPreference
 
 
 # Response Models
@@ -29,14 +30,14 @@ class UserProfile(BaseModel):
     bio: Optional[str] = None
     profile_image_url: Optional[str] = None
     created_at: datetime
-    show_nsfw: bool = True
+    show_nsfw: NSFWPreference = NSFWPreference.ASK
 
 
 class UserProfileUpdate(BaseModel):
     email: Optional[str] = None
     full_name: Optional[str] = Field(None, max_length=100)
     bio: Optional[str] = Field(None, max_length=500)
-    show_nsfw: Optional[bool] = None
+    show_nsfw: Optional[NSFWPreference] = None
 
 
 class Token(BaseModel):

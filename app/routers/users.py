@@ -6,6 +6,7 @@ from app.auth import get_password_hash, verify_password, create_access_token, ge
 from app.database import get_database
 from app.config import settings
 from app.utils.storage import r2_storage
+from app.models import NSFWPreference
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -34,7 +35,7 @@ async def register_user(user_data: UserRegister):
         "bio": None,
         "profile_image_url": None,
         "is_active": True,
-        "show_nsfw": True  # Default to showing NSFW content
+        "show_nsfw": NSFWPreference.ASK  # Default to ask before showing NSFW content
     }
     
     from datetime import datetime, timezone

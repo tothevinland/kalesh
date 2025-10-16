@@ -1,8 +1,15 @@
 from datetime import datetime, timezone, timedelta
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Literal
 from pydantic import BaseModel, Field, EmailStr, ConfigDict, field_serializer
 from pydantic_core import core_schema
 from bson import ObjectId
+from enum import Enum
+
+
+class NSFWPreference(str, Enum):
+    SHOW = "show"
+    ASK = "ask_before_showing"
+    HIDE = "dont_show"
 
 
 class PyObjectId(str):
@@ -49,7 +56,7 @@ class UserInDB(BaseModel):
     profile_image_url: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_active: bool = True
-    show_nsfw: bool = True  # User preference to show NSFW content (default: show)
+    show_nsfw: NSFWPreference = NSFWPreference.ASK  # User preference for NSFW content (default: ask before showing)
 
 
 class VideoInDB(BaseModel):
