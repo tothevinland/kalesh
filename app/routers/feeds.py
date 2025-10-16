@@ -68,8 +68,6 @@ async def get_trending_videos(
         # For the 'ask' option, we still return NSFW content but with a flag
         # The frontend will handle blurring/warning based on the is_nsfw flag
         pass  # No additional filtering needed, frontend will handle blurring
-    
-    # Add exclusion filter if we have videos to exclude
     if excluded_video_ids:
         match_condition["_id"] = {"$nin": excluded_video_ids}
     
@@ -283,8 +281,13 @@ async def get_recent_videos(
         # For the 'ask' option, we still return NSFW content but with a flag
         # The frontend will handle blurring/warning based on the is_nsfw flag
         pass  # No additional filtering needed, frontend will handle blurring
+        
+    # IMPORTANT: Don't filter out already watched videos in search results
+    # Users expect search to return ALL matching videos regardless of watch history
     
     # Add exclusion filter if we have videos to exclude
+    # For feeds like trending and discover, we want to exclude already watched videos
+    # But for search and individual video endpoints, we want to show all videos
     if excluded_video_ids:
         match_condition["_id"] = {"$nin": excluded_video_ids}
     
@@ -742,12 +745,20 @@ async def search_videos(
     }
     
     # Filter NSFW content based on user preference
-    show_nsfw = False
+    nsfw_pref = NSFWPreference.ASK  # Default to ask before showing NSFW content
     if current_user:
-        show_nsfw = current_user.get("show_nsfw", False)
+        nsfw_pref = current_user.get("show_nsfw", NSFWPreference.ASK)
     
-    if not show_nsfw:
+    # Add NSFW filtering based on preference
+    if nsfw_pref == NSFWPreference.HIDE:
+        # Don't show any NSFW content
         search_query["$or"] = [{"is_nsfw": False}, {"is_nsfw": {"$exists": False}}]
+    elif nsfw_pref == NSFWPreference.ASK:
+        # For the 'ask' option, we still return NSFW content but with a flag
+        # The frontend will handle blurring/warning based on the is_nsfw flag
+        pass  # No additional filtering needed, frontend will handle blurring
+        
+    # IMPORTANT: Search should show ALL matching videos including already watched ones
     
     # Get videos matching the search query
     videos_cursor = db.videos.find(
