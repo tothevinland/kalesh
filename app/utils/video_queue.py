@@ -7,6 +7,7 @@ import os
 import requests
 from app.utils.video_processing import video_processor
 from app.utils.storage import r2_storage
+from app.config import settings
 
 
 class VideoProcessingQueue:
@@ -14,6 +15,7 @@ class VideoProcessingQueue:
         self.queue = asyncio.Queue()
         self.processing = False
         self.worker_task = None
+        self.semaphore = asyncio.Semaphore(getattr(settings, 'MAX_CONCURRENT_UPLOADS', 1))
         
     def start_worker(self):
         """Start the background worker task"""
@@ -33,8 +35,11 @@ class VideoProcessingQueue:
         print(f"Video {video_id} added to processing queue. Queue size: {self.queue.qsize()}")
     
     async def _worker(self):
-        """Background worker that processes videos one by one"""
+        """Background worker that processes videos with concurrency control"""
         print("Worker task started, waiting for videos...")
+        
+        # Create a list to hold all running tasks
+        tasks = []
         
         while self.processing:
             try:
@@ -44,16 +49,17 @@ class VideoProcessingQueue:
                 video_id = task['video_id']
                 raw_video_url = task['raw_video_url']
                 
-                print(f"Processing video {video_id}... Queue remaining: {self.queue.qsize()}")
+                print(f"Queueing video {video_id}... Queue remaining: {self.queue.qsize()}")
                 
-                # Process the video
-                try:
-                    await self._process_video(video_id, raw_video_url)
-                    print(f"Video {video_id} processed successfully")
-                except Exception as process_error:
-                    print(f"Error processing video {video_id}: {process_error}")
-                finally:
-                    self.queue.task_done()
+                # Create a task for processing this video
+                process_task = asyncio.create_task(self._process_video_with_semaphore(video_id, raw_video_url))
+                
+                # Add cleanup callback
+                process_task.add_done_callback(lambda t: tasks.remove(t) if t in tasks else None)
+                tasks.append(process_task)
+                
+                # Mark the queue item as done
+                self.queue.task_done()
                 
             except asyncio.TimeoutError:
                 # Queue timeout - this is normal, just continue
@@ -61,6 +67,19 @@ class VideoProcessingQueue:
             except Exception as e:
                 print(f"Worker error: {e}")
                 continue
+                
+            # Clean up completed tasks
+            tasks = [t for t in tasks if not t.done()]
+    
+    async def _process_video_with_semaphore(self, video_id: str, raw_video_url: str):
+        """Process a video with semaphore for concurrency control"""
+        async with self.semaphore:
+            print(f"Processing video {video_id}...")
+            try:
+                await self._process_video(video_id, raw_video_url)
+                print(f"Video {video_id} processed successfully")
+            except Exception as process_error:
+                print(f"Error processing video {video_id}: {process_error}")
     
     async def _process_video(self, video_id: str, raw_video_url: str):
         """Process a single video"""

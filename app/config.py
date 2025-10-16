@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     ALLOWED_VIDEO_TYPES: str = "video/mp4,video/mpeg,video/quicktime,video/x-msvideo,video/webm"
     
     # Video Compression Settings
-    VIDEO_COMPRESSION_PRESET: str = "slow"  # ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow
+    VIDEO_COMPRESSION_PRESET: str = "medium"  # ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow
     VIDEO_CRF_1080P: int = 23
     VIDEO_CRF_720P: int = 24
     VIDEO_CRF_480P: int = 25
@@ -33,7 +33,12 @@ class Settings(BaseSettings):
     VIDEO_BITRATE_720P: str = "1800k"
     VIDEO_BITRATE_480P: str = "900k"
     VIDEO_BITRATE_360P: str = "500k"
-    USE_TWO_PASS_ENCODING: bool = True
+    USE_TWO_PASS_ENCODING: bool = False  # Disable two-pass by default to save resources
+    
+    # Resource Limiting Settings
+    FFMPEG_THREADS: int = 0  # 0 means auto-select based on CPU cores, set to specific number to limit
+    MAX_CONCURRENT_UPLOADS: int = 1  # Maximum number of concurrent video processing tasks
+    MAX_CONCURRENT_DELETIONS: int = 2  # Maximum number of concurrent deletion tasks
     
     @property
     def allowed_video_types_list(self) -> List[str]:

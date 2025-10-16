@@ -178,9 +178,14 @@ class VideoProcessor:
                         result = subprocess.run(cmd, capture_output=True, timeout=300)
                 else:
                     # Single-pass encoding if two-pass is disabled
+                    # Get thread count from settings
+                    thread_count = getattr(settings, 'FFMPEG_THREADS', 0)
+                    thread_param = [] if thread_count == 0 else ['-threads', str(thread_count)]
+                    
                     cmd = [
                         '/usr/bin/ffmpeg',
                         '-i', video_path,
+                    ] + thread_param + [
                         '-vf', f"scale={settings['width']}:{settings['height']}:force_original_aspect_ratio=decrease",
                         '-c:v', 'libx264',
                         '-b:v', settings['bitrate'],
@@ -285,10 +290,15 @@ class VideoProcessor:
             with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp_thumb:
                 thumbnail_path = tmp_thumb.name
 
+            # Get thread count from settings
+            thread_count = getattr(settings, 'FFMPEG_THREADS', 0)
+            thread_param = [] if thread_count == 0 else ['-threads', str(thread_count)]
+            
             cmd = [
                 '/usr/bin/ffmpeg',
                 '-ss', time_offset,
                 '-i', video_path,
+            ] + thread_param + [
                 '-vframes', '1',
                 '-q:v', '2',
                 '-y',

@@ -369,10 +369,11 @@ async def delete_video(
             detail="You can only delete your own videos"
         )
     
-    # Delete from R2 (HLS content)
-    await r2_storage.delete_hls_content(video["playlist_url"])
+    # Queue files for deletion in background
+    from app.utils.deletion_queue import deletion_queue
+    await deletion_queue.add_to_queue('hls', video["playlist_url"])
     if video.get("thumbnail_url"):
-        await r2_storage.delete_file(video["thumbnail_url"])
+        await deletion_queue.add_to_queue('regular', video["thumbnail_url"])
     
     # Mark as inactive (soft delete)
     await db.videos.update_one(

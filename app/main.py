@@ -16,10 +16,15 @@ async def lifespan(app: FastAPI):
     from app.utils.video_queue import video_queue
     video_queue.start_worker()
     
+    # Start file deletion queue worker
+    from app.utils.deletion_queue import deletion_queue
+    deletion_queue.start_worker()
+    
     yield
     
     # Shutdown
     await video_queue.stop_worker()
+    await deletion_queue.stop_worker()
     await close_mongo_connection()
 
 
