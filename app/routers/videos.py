@@ -312,6 +312,115 @@ async def track_video_view(
     )
 
 
+@router.get("/my-videos", response_model=APIResponse)
+async def search_my_videos(
+    query: Optional[str] = Query(None, description="Search query for your video titles and descriptions"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Search through the authenticated user's own videos
+    """
+    db = get_database()
+    user_id = str(current_user["_id"])
+    
+    # Calculate skip
+    skip = (page - 1) * page_size
+    
+    # Build search query
+    search_query = {
+        "uploader_id": user_id,
+        "is_active": True
+    }
+    
+    # Add text search if query is provided
+    if query and query.strip():
+        search_query["$text"] = {"$search": query}
+    
+    # Get videos
+    if query and query.strip():
+        # Use text search with relevance scoring
+        videos_cursor = db.videos.find(
+            search_query,
+            {"score": {"$meta": "textScore"}}
+        ).sort([
+            ("score", {"$meta": "textScore"}),
+            ("created_at", -1)
+        ]).skip(skip).limit(page_size)
+    else:
+        # Just get all user's videos sorted by date
+        videos_cursor = db.videos.find(search_query).sort("created_at", -1).skip(skip).limit(page_size)
+    
+    videos = await videos_cursor.to_list(length=page_size)
+    
+    # Get total count
+    total = await db.videos.count_documents(search_query)
+    
+    # Format videos with user interactions
+    video_list = []
+    for video in videos:
+        video_id = str(video["_id"])
+        
+        # Get user interactions
+        like = await db.interactions.find_one({
+            "user_id": user_id,
+            "video_id": video_id,
+            "interaction_type": "like"
+        })
+        dislike = await db.interactions.find_one({
+            "user_id": user_id,
+            "video_id": video_id,
+            "interaction_type": "dislike"
+        })
+        save = await db.interactions.find_one({
+            "user_id": user_id,
+            "video_id": video_id,
+            "interaction_type": "save"
+        })
+        
+        user_interaction = {
+            "liked": like is not None,
+            "disliked": dislike is not None,
+            "saved": save is not None
+        }
+        
+        video_response = VideoResponse(
+            id=video_id,
+            uploader_id=video["uploader_id"],
+            uploader_username=video["uploader_username"],
+            uploader_profile_image_url=video.get("uploader_profile_image_url"),
+            title=video["title"],
+            description=video.get("description"),
+            tags=video.get("tags", []),
+            playlist_url=video["playlist_url"],
+            thumbnail_url=video.get("thumbnail_url"),
+            duration=video.get("duration"),
+            views=video["views"],
+            likes=video["likes"],
+            dislikes=video["dislikes"],
+            saved_count=video["saved_count"],
+            processing_status=video.get("processing_status", "completed"),
+            created_at=format_datetime_response(video["created_at"]),
+            user_interaction=user_interaction,
+            is_nsfw=video.get("is_nsfw", False),
+            last_part_id=video.get("last_part_id"),
+            next_part_id=video.get("next_part_id")
+        )
+        video_list.append(video_response.model_dump())
+    
+    return APIResponse(
+        status="success",
+        message=f"Your videos retrieved successfully" + (f" (search: '{query}')" if query else ""),
+        data={
+            "videos": video_list,
+            "total": total,
+            "page": page,
+            "page_size": page_size
+        }
+    )
+
+
 @router.get("/{video_id}", response_model=APIResponse)
 async def get_video(
     video_id: str,
@@ -461,113 +570,3 @@ async def delete_video(
         message="Video deleted successfully",
         data=None
     )
-
-
-@router.get("/my-videos", response_model=APIResponse)
-async def search_my_videos(
-    query: Optional[str] = Query(None, description="Search query for your video titles and descriptions"),
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    current_user: dict = Depends(get_current_user)
-):
-    """
-    Search through the authenticated user's own videos
-    """
-    db = get_database()
-    user_id = str(current_user["_id"])
-    
-    # Calculate skip
-    skip = (page - 1) * page_size
-    
-    # Build search query
-    search_query = {
-        "uploader_id": user_id,
-        "is_active": True
-    }
-    
-    # Add text search if query is provided
-    if query and query.strip():
-        search_query["$text"] = {"$search": query}
-    
-    # Get videos
-    if query and query.strip():
-        # Use text search with relevance scoring
-        videos_cursor = db.videos.find(
-            search_query,
-            {"score": {"$meta": "textScore"}}
-        ).sort([
-            ("score", {"$meta": "textScore"}),
-            ("created_at", -1)
-        ]).skip(skip).limit(page_size)
-    else:
-        # Just get all user's videos sorted by date
-        videos_cursor = db.videos.find(search_query).sort("created_at", -1).skip(skip).limit(page_size)
-    
-    videos = await videos_cursor.to_list(length=page_size)
-    
-    # Get total count
-    total = await db.videos.count_documents(search_query)
-    
-    # Format videos with user interactions
-    video_list = []
-    for video in videos:
-        video_id = str(video["_id"])
-        
-        # Get user interactions
-        like = await db.interactions.find_one({
-            "user_id": user_id,
-            "video_id": video_id,
-            "interaction_type": "like"
-        })
-        dislike = await db.interactions.find_one({
-            "user_id": user_id,
-            "video_id": video_id,
-            "interaction_type": "dislike"
-        })
-        save = await db.interactions.find_one({
-            "user_id": user_id,
-            "video_id": video_id,
-            "interaction_type": "save"
-        })
-        
-        user_interaction = {
-            "liked": like is not None,
-            "disliked": dislike is not None,
-            "saved": save is not None
-        }
-        
-        video_response = VideoResponse(
-            id=video_id,
-            uploader_id=video["uploader_id"],
-            uploader_username=video["uploader_username"],
-            uploader_profile_image_url=video.get("uploader_profile_image_url"),
-            title=video["title"],
-            description=video.get("description"),
-            tags=video.get("tags", []),
-            playlist_url=video["playlist_url"],
-            thumbnail_url=video.get("thumbnail_url"),
-            duration=video.get("duration"),
-            views=video["views"],
-            likes=video["likes"],
-            dislikes=video["dislikes"],
-            saved_count=video["saved_count"],
-            processing_status=video.get("processing_status", "completed"),
-            created_at=format_datetime_response(video["created_at"]),
-            user_interaction=user_interaction,
-            is_nsfw=video.get("is_nsfw", False),
-            last_part_id=video.get("last_part_id"),
-            next_part_id=video.get("next_part_id")
-        )
-        video_list.append(video_response.model_dump())
-    
-    return APIResponse(
-        status="success",
-        message=f"Your videos retrieved successfully" + (f" (search: '{query}')" if query else ""),
-        data={
-            "videos": video_list,
-            "total": total,
-            "page": page,
-            "page_size": page_size
-        }
-    )
-
