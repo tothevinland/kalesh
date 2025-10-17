@@ -140,6 +140,8 @@ class VideoResponse(BaseModel):
     created_at: DateTimeResponse
     user_interaction: Optional[dict] = None  # {"liked": bool, "disliked": bool, "saved": bool}
     is_nsfw: bool = False
+    last_part_id: Optional[str] = None  # Reference to previous video in series
+    next_part_id: Optional[str] = None  # Reference to next video in series
 
 
 class VideoList(BaseModel):

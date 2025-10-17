@@ -218,7 +218,10 @@ async def get_trending_videos(
             saved_count=video["saved_count"],
             processing_status=video.get("processing_status", "completed"),
             created_at=format_datetime_response(video["created_at"]),
-            user_interaction=user_interaction
+            user_interaction=user_interaction,
+            is_nsfw=video.get("is_nsfw", False),
+            last_part_id=video.get("last_part_id"),
+            next_part_id=video.get("next_part_id")
         )
         video_list.append(video_response.model_dump())
     
@@ -416,7 +419,10 @@ async def get_recent_videos(
             saved_count=video["saved_count"],
             processing_status=video.get("processing_status", "completed"),
             created_at=format_datetime_response(video["created_at"]),
-            user_interaction=user_interaction
+            user_interaction=user_interaction,
+            is_nsfw=video.get("is_nsfw", False),
+            last_part_id=video.get("last_part_id"),
+            next_part_id=video.get("next_part_id")
         )
         video_list.append(video_response.model_dump())
     
@@ -501,6 +507,7 @@ async def get_saved_videos(
                 id=str(video["_id"]),
                 uploader_id=video["uploader_id"],
                 uploader_username=video["uploader_username"],
+                uploader_profile_image_url=video.get("uploader_profile_image_url"),
                 title=video["title"],
                 description=video.get("description"),
                 tags=video.get("tags", []),
@@ -512,7 +519,10 @@ async def get_saved_videos(
                 dislikes=video["dislikes"],
                 saved_count=video["saved_count"],
                 created_at=format_datetime_response(video["created_at"]),
-                user_interaction=user_interaction
+                user_interaction=user_interaction,
+                is_nsfw=video.get("is_nsfw", False),
+                last_part_id=video.get("last_part_id"),
+                next_part_id=video.get("next_part_id")
             )
             video_list.append(video_response.model_dump())
     
@@ -713,7 +723,10 @@ async def discover_videos(
             saved_count=video["saved_count"],
             processing_status=video.get("processing_status", "completed"),
             created_at=format_datetime_response(video["created_at"]),
-            user_interaction=user_interaction
+            user_interaction=user_interaction,
+            is_nsfw=video.get("is_nsfw", False),
+            last_part_id=video.get("last_part_id"),
+            next_part_id=video.get("next_part_id")
         )
         video_list.append(video_response.model_dump())
     
@@ -837,7 +850,10 @@ async def search_videos(
             saved_count=video["saved_count"],
             processing_status=video.get("processing_status", "completed"),
             created_at=format_datetime_response(video["created_at"]),
-            user_interaction=user_interaction
+            user_interaction=user_interaction,
+            is_nsfw=video.get("is_nsfw", False),
+            last_part_id=video.get("last_part_id"),
+            next_part_id=video.get("next_part_id")
         )
         video_list.append(video_response.model_dump())
     
@@ -969,7 +985,10 @@ async def get_user_videos(
             saved_count=video["saved_count"],
             processing_status=video.get("processing_status", "completed"),
             created_at=format_datetime_response(video["created_at"]),
-            user_interaction=user_interaction
+            user_interaction=user_interaction,
+            is_nsfw=video.get("is_nsfw", False),
+            last_part_id=video.get("last_part_id"),
+            next_part_id=video.get("next_part_id")
         )
         video_list.append(video_response.model_dump())
     

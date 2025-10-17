@@ -86,6 +86,8 @@ class VideoInDB(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_active: bool = True
     is_nsfw: bool = False  # Flag for NSFW content
+    last_part_id: Optional[str] = None  # Reference to previous video in series
+    next_part_id: Optional[str] = None  # Reference to next video in series
 
 
 class InteractionInDB(BaseModel):
