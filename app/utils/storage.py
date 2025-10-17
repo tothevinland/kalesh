@@ -1,8 +1,10 @@
 import boto3
 from botocore.client import Config
 from botocore.exceptions import ClientError
-from typing import Optional, Dict
+from typing import Optional, Dict, Any, Callable
 import uuid
+import asyncio
+from functools import partial
 from app.config import settings
 
 
@@ -18,7 +20,16 @@ class R2Storage:
         )
         self.bucket_name = settings.R2_BUCKET_NAME
         self.public_url = settings.R2_PUBLIC_URL
+        
+        # Create a semaphore to limit concurrent S3 operations
+        self.s3_semaphore = asyncio.Semaphore(getattr(settings, 'MAX_CONCURRENT_S3_OPS', 10))
 
+    async def _run_in_executor(self, func: Callable, *args, **kwargs) -> Any:
+        """Run a blocking function in a thread pool executor with semaphore to limit concurrency"""
+        async with self.s3_semaphore:
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(None, partial(func, *args, **kwargs))
+    
     async def upload_file(self, file_data: bytes, filename: str, content_type: str) -> str:
         """
         Upload file to R2 and return the public URL
@@ -27,8 +38,9 @@ class R2Storage:
             # Generate unique filename
             unique_filename = f"{uuid.uuid4()}_{filename}"
             
-            # Upload to R2
-            self.s3_client.put_object(
+            # Upload to R2 in a thread pool to avoid blocking the event loop
+            await self._run_in_executor(
+                self.s3_client.put_object,
                 Bucket=self.bucket_name,
                 Key=unique_filename,
                 Body=file_data,
@@ -39,6 +51,7 @@ class R2Storage:
             file_url = f"{self.public_url}/{unique_filename}"
             return file_url
         except ClientError as e:
+            print(f"R2 upload error: {str(e)}")
             raise Exception(f"Failed to upload file to R2")
 
     async def upload_hls_content(self, hls_data: Dict, video_id: str) -> str:
@@ -51,7 +64,8 @@ class R2Storage:
             
             # Upload master playlist
             master_key = f"{base_path}/master.m3u8"
-            self.s3_client.put_object(
+            await self._run_in_executor(
+                self.s3_client.put_object,
                 Bucket=self.bucket_name,
                 Key=master_key,
                 Body=hls_data['master_playlist'].encode('utf-8'),
@@ -62,7 +76,8 @@ class R2Storage:
             for quality, data in hls_data['playlists'].items():
                 # Upload playlist
                 playlist_key = f"{base_path}/{quality}/playlist.m3u8"
-                self.s3_client.put_object(
+                await self._run_in_executor(
+                    self.s3_client.put_object,
                     Bucket=self.bucket_name,
                     Key=playlist_key,
                     Body=data['playlist'].encode('utf-8'),
@@ -72,7 +87,8 @@ class R2Storage:
                 # Upload segments
                 for segment in data['segments']:
                     segment_key = f"{base_path}/{quality}/{segment['filename']}"
-                    self.s3_client.put_object(
+                    await self._run_in_executor(
+                        self.s3_client.put_object,
                         Bucket=self.bucket_name,
                         Key=segment_key,
                         Body=segment['data'],
@@ -95,7 +111,8 @@ class R2Storage:
             filename = file_url.split('/')[-1]
             
             # Delete from R2
-            self.s3_client.delete_object(
+            await self._run_in_executor(
+                self.s3_client.delete_object,
                 Bucket=self.bucket_name,
                 Key=filename
             )
@@ -119,7 +136,8 @@ class R2Storage:
                     base_path = f"hls/{video_id}/"
                     
                     # List all objects with this prefix
-                    response = self.s3_client.list_objects_v2(
+                    response = await self._run_in_executor(
+                        self.s3_client.list_objects_v2,
                         Bucket=self.bucket_name,
                         Prefix=base_path
                     )
@@ -127,7 +145,8 @@ class R2Storage:
                     # Delete all objects
                     if 'Contents' in response:
                         for obj in response['Contents']:
-                            self.s3_client.delete_object(
+                            await self._run_in_executor(
+                                self.s3_client.delete_object,
                                 Bucket=self.bucket_name,
                                 Key=obj['Key']
                             )

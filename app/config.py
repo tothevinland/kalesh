@@ -36,9 +36,10 @@ class Settings(BaseSettings):
     USE_TWO_PASS_ENCODING: bool = False  # Disable two-pass by default to save resources
     
     # Resource Limiting Settings
-    FFMPEG_THREADS: int = 0  # 0 means auto-select based on CPU cores, set to specific number to limit
+    FFMPEG_THREADS: int = 2  # Limit FFmpeg to use fewer threads to avoid overloading the server
     MAX_CONCURRENT_UPLOADS: int = 1  # Maximum number of concurrent video processing tasks
     MAX_CONCURRENT_DELETIONS: int = 2  # Maximum number of concurrent deletion tasks
+    MAX_CONCURRENT_S3_OPS: int = 10  # Maximum number of concurrent S3 operations
     
     @property
     def allowed_video_types_list(self) -> List[str]:
