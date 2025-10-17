@@ -123,7 +123,7 @@ async def upload_video(
             dislikes=video_doc["dislikes"],
             saved_count=video_doc["saved_count"],
             processing_status=video_doc["processing_status"],
-            created_at=video_doc["created_at"],
+            created_at=format_datetime_response(video_doc["created_at"]),
             is_nsfw=video_doc["is_nsfw"]
         )
         
@@ -134,9 +134,23 @@ async def upload_video(
         )
     
     except Exception as e:
+        # Log the full error for debugging
+        print(f"Video upload error: {str(e)}")
+        
+        # Try to clean up any resources if possible
+        try:
+            if 'result' in locals() and 'video_id' in locals():
+                # If the video was added to the database but processing failed
+                await db.videos.update_one(
+                    {"_id": ObjectId(video_id)},
+                    {"$set": {"processing_status": "failed", "processing_error": str(e)}}
+                )
+        except Exception:
+            pass
+            
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upload video: {str(e)}"
+            detail="Failed to upload video. Please try again."
         )
 
 

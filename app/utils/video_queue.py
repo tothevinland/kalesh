@@ -97,13 +97,17 @@ class VideoProcessingQueue:
             temp_path = None
             
             def download_file():
-                response = requests.get(raw_video_url, stream=True, timeout=300)
-                response.raise_for_status()
-                
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_file:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        tmp_file.write(chunk)
-                    return tmp_file.name
+                try:
+                    response = requests.get(raw_video_url, stream=True, timeout=300)
+                    response.raise_for_status()
+                    
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_file:
+                        for chunk in response.iter_content(chunk_size=65536):  # Larger chunks for faster download
+                            tmp_file.write(chunk)
+                        return tmp_file.name
+                except Exception as e:
+                    print(f"Download error for video {video_id}: {str(e)}")
+                    raise
             
             # Run download in thread pool to avoid blocking
             loop = asyncio.get_event_loop()

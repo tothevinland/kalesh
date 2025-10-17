@@ -24,11 +24,11 @@ class Settings(BaseSettings):
     ALLOWED_VIDEO_TYPES: str = "video/mp4,video/mpeg,video/quicktime,video/x-msvideo,video/webm"
     
     # Video Compression Settings
-    VIDEO_COMPRESSION_PRESET: str = "medium"  # ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow
-    VIDEO_CRF_1080P: int = 23
-    VIDEO_CRF_720P: int = 24
-    VIDEO_CRF_480P: int = 25
-    VIDEO_CRF_360P: int = 26
+    VIDEO_COMPRESSION_PRESET: str = "fast"  # ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow
+    VIDEO_CRF_1080P: int = 24  # Higher CRF = faster encoding, slightly lower quality
+    VIDEO_CRF_720P: int = 25
+    VIDEO_CRF_480P: int = 26
+    VIDEO_CRF_360P: int = 27
     VIDEO_BITRATE_1080P: str = "3500k"
     VIDEO_BITRATE_720P: str = "1800k"
     VIDEO_BITRATE_480P: str = "900k"
