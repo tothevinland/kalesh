@@ -26,7 +26,7 @@ limiter = Limiter(
     key_func=get_client_ip,
     default_limits=["200 per minute"],  # Default limit for all endpoints
     storage_uri="memory://",  # Use in-memory storage
-    headers_enabled=True  # Add rate limit info to response headers
+    headers_enabled=False  # Disable headers to not expose rate limit info
 )
 
 # Custom rate limit strings for different endpoint types

@@ -2,7 +2,6 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.database import connect_to_mongo, close_mongo_connection
 from app.routers import users, videos, interactions, feeds, comments, tags
@@ -37,9 +36,23 @@ app = FastAPI(
     redoc_url=None
 )
 
-# Add rate limiter state and exception handler
+# Add rate limiter state
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Custom rate limit exception handler (minimal info disclosure)
+@app.exception_handler(RateLimitExceeded)
+async def custom_rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    """
+    Custom rate limit handler that doesn't expose sensitive information
+    """
+    return JSONResponse(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        content={
+            "status": "error",
+            "message": "Too many requests. Please try again later.",
+            "data": None
+        }
+    )
 
 # CORS middleware
 app.add_middleware(
