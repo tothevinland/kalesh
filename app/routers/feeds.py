@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Query, Request
+from fastapi import APIRouter, HTTPException, status, Depends, Query, Request, Response
 from typing import Optional, List
 from bson import ObjectId
 from datetime import datetime, timezone, timedelta
@@ -18,6 +18,7 @@ router = APIRouter(prefix="/feeds", tags=["feeds"])
 @limiter.limit(RATE_LIMIT_READ)
 async def get_trending_videos(
     request: Request,
+    response: Response,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     current_user: Optional[dict] = Depends(get_current_user_optional)
@@ -245,6 +246,7 @@ async def get_trending_videos(
 @limiter.limit(RATE_LIMIT_READ)
 async def get_recent_videos(
     request: Request,
+    response: Response,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     current_user: Optional[dict] = Depends(get_current_user_optional)
@@ -448,6 +450,7 @@ async def get_recent_videos(
 @limiter.limit(RATE_LIMIT_READ)
 async def get_saved_videos(
     request: Request,
+    response: Response,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     current_user: dict = Depends(get_current_user)
@@ -550,6 +553,7 @@ async def get_saved_videos(
 @limiter.limit(RATE_LIMIT_READ)
 async def discover_videos(
     request: Request,
+    response: Response,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     current_user: Optional[dict] = Depends(get_current_user_optional)
@@ -756,6 +760,7 @@ async def discover_videos(
 @limiter.limit(RATE_LIMIT_READ)
 async def search_videos(
     request: Request,
+    response: Response,
     query: str = Query(..., min_length=1, description="Search query for video titles and descriptions"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=50),
@@ -914,6 +919,7 @@ async def search_videos(
 @limiter.limit(RATE_LIMIT_READ)
 async def get_user_videos(
     request: Request,
+    response: Response,
     username: str,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),

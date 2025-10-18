@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends, UploadFile, File, Request
+from fastapi import APIRouter, HTTPException, status, Depends, UploadFile, File, Request, Response
 from datetime import timedelta
 from bson import ObjectId
 from app.schemas import UserRegister, UserLogin, Token, UserProfile, UserProfileUpdate, APIResponse
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 @router.post("/register", response_model=APIResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit(RATE_LIMIT_REGISTER)
-async def register_user(request: Request, user_data: UserRegister):
+async def register_user(request: Request, response: Response, user_data: UserRegister):
     """
     Register a new user - only username and password required
     Rate limit: 3 per hour per IP
@@ -76,7 +76,7 @@ async def register_user(request: Request, user_data: UserRegister):
 
 @router.post("/login", response_model=APIResponse)
 @limiter.limit(RATE_LIMIT_LOGIN)
-async def login_user(request: Request, user_data: UserLogin):
+async def login_user(request: Request, response: Response, user_data: UserLogin):
     """
     Login user with username and password
     Rate limit: 10 per hour per IP
@@ -127,7 +127,7 @@ async def login_user(request: Request, user_data: UserLogin):
 
 @router.get("/profile", response_model=APIResponse)
 @limiter.limit(RATE_LIMIT_READ)
-async def get_user_profile(request: Request, current_user: dict = Depends(get_current_user)):
+async def get_user_profile(request: Request, response: Response, current_user: dict = Depends(get_current_user)):
     """
     Get current user's profile
     Rate limit: 500 per hour per IP
@@ -158,7 +158,7 @@ async def get_user_profile(request: Request, current_user: dict = Depends(get_cu
 
 @router.get("/profile/{username}", response_model=APIResponse)
 @limiter.limit(RATE_LIMIT_READ)
-async def get_user_profile_by_username(request: Request, username: str):
+async def get_user_profile_by_username(request: Request, response: Response, username: str):
     """
     Get user profile by username (public endpoint)
     Rate limit: 500 per hour per IP
@@ -193,6 +193,7 @@ async def get_user_profile_by_username(request: Request, username: str):
 @limiter.limit(RATE_LIMIT_PROFILE_UPDATE)
 async def update_user_profile(
     request: Request,
+    response: Response,
     profile_data: UserProfileUpdate,
     current_user: dict = Depends(get_current_user)
 ):
@@ -248,6 +249,7 @@ async def update_user_profile(
 @limiter.limit(RATE_LIMIT_AVATAR_UPLOAD)
 async def upload_avatar(
     request: Request,
+    response: Response,
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user)
 ):

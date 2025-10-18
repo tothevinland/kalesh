@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Request
+from fastapi import APIRouter, HTTPException, status, Depends, Request, Response
 from bson import ObjectId
 from datetime import datetime, timezone
 from app.schemas import InteractionResponse, ReportCreate, APIResponse
@@ -14,6 +14,7 @@ router = APIRouter(prefix="/interactions", tags=["interactions"])
 @limiter.limit(RATE_LIMIT_VIDEO_INTERACTION)
 async def like_video(
     request: Request,
+    response: Response,
     video_id: str,
     current_user: dict = Depends(get_current_user)
 ):
@@ -107,6 +108,7 @@ async def like_video(
 @limiter.limit(RATE_LIMIT_VIDEO_INTERACTION)
 async def dislike_video(
     request: Request,
+    response: Response,
     video_id: str,
     current_user: dict = Depends(get_current_user)
 ):
@@ -200,6 +202,7 @@ async def dislike_video(
 @limiter.limit(RATE_LIMIT_VIDEO_INTERACTION)
 async def save_video(
     request: Request,
+    response: Response,
     video_id: str,
     current_user: dict = Depends(get_current_user)
 ):
@@ -279,6 +282,7 @@ async def save_video(
 @limiter.limit(RATE_LIMIT_REPORT)
 async def report_video(
     request: Request,
+    response: Response,
     video_id: str,
     report_data: ReportCreate,
     current_user: dict = Depends(get_current_user)

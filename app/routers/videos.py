@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends, UploadFile, File, Form, Query, Request
+from fastapi import APIRouter, HTTPException, status, Depends, UploadFile, File, Form, Query, Request, Response
 from typing import Optional, List
 from bson import ObjectId
 from datetime import datetime, timezone, timedelta
@@ -22,6 +22,7 @@ router = APIRouter(prefix="/videos", tags=["videos"])
 @limiter.limit(RATE_LIMIT_VIDEO_UPLOAD)
 async def upload_video(
     request: Request,
+    response: Response,
     title: str = Form(...),
     description: Optional[str] = Form(None),
     tags: Optional[str] = Form(None),  # Comma-separated tags
@@ -202,6 +203,7 @@ async def upload_video(
 @limiter.limit(RATE_LIMIT_READ)
 async def get_video_processing_status(
     request: Request,
+    response: Response,
     video_id: str,
     current_user: dict = Depends(get_current_user)
 ):
@@ -256,6 +258,7 @@ async def get_video_processing_status(
 @limiter.limit(RATE_LIMIT_READ)
 async def track_video_view(
     request: Request,
+    response: Response,
     video_id: str,
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
@@ -326,6 +329,7 @@ async def track_video_view(
 @limiter.limit(RATE_LIMIT_READ)
 async def search_my_videos(
     request: Request,
+    response: Response,
     query: Optional[str] = Query(None, description="Search query for your video titles and descriptions"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -438,6 +442,7 @@ async def search_my_videos(
 @limiter.limit(RATE_LIMIT_READ)
 async def get_video(
     request: Request,
+    response: Response,
     video_id: str,
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
@@ -523,6 +528,7 @@ async def get_video(
 @limiter.limit(RATE_LIMIT_PROFILE_UPDATE)
 async def delete_video(
     request: Request,
+    response: Response,
     video_id: str,
     current_user: dict = Depends(get_current_user)
 ):

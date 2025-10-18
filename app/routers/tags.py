@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Query, Request
+from fastapi import APIRouter, HTTPException, status, Depends, Query, Request, Response
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
@@ -15,6 +15,7 @@ router = APIRouter(prefix="/tags", tags=["tags"])
 @limiter.limit(RATE_LIMIT_READ)
 async def get_trending_tags(
     request: Request,
+    response: Response,
     limit: int = Query(10, ge=1, le=50),
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
@@ -90,6 +91,7 @@ async def get_trending_tags(
 @limiter.limit(RATE_LIMIT_READ)
 async def suggest_tags(
     request: Request,
+    response: Response,
     query: str = Query(..., min_length=1, max_length=50),
     limit: int = Query(10, ge=1, le=50),
     current_user: Optional[dict] = Depends(get_current_user_optional)
@@ -146,6 +148,7 @@ async def suggest_tags(
 @limiter.limit(RATE_LIMIT_READ)
 async def explore_by_tag(
     request: Request,
+    response: Response,
     tag: str = Query(..., min_length=1, max_length=50),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=50),

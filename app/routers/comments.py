@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Query, Request
+from fastapi import APIRouter, HTTPException, status, Depends, Query, Request, Response
 from typing import Optional
 from bson import ObjectId
 from datetime import datetime, timezone
@@ -23,6 +23,7 @@ router = APIRouter(prefix="/comments", tags=["comments"])
 @limiter.limit(RATE_LIMIT_COMMENT_CREATE)
 async def create_comment(
     request: Request,
+    response: Response,
     video_id: str,
     comment_data: CommentCreate,
     current_user: dict = Depends(get_current_user)
@@ -88,6 +89,7 @@ async def create_comment(
 @limiter.limit(RATE_LIMIT_COMMENT_REPLY)
 async def reply_to_comment(
     request: Request,
+    response: Response,
     comment_id: str,
     reply_data: CommentCreate,
     current_user: dict = Depends(get_current_user)
@@ -166,6 +168,7 @@ async def reply_to_comment(
 @limiter.limit(RATE_LIMIT_READ)
 async def get_video_comments(
     request: Request,
+    response: Response,
     video_id: str,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -281,6 +284,7 @@ async def get_video_comments(
 @limiter.limit(RATE_LIMIT_COMMENT_LIKE)
 async def like_comment(
     request: Request,
+    response: Response,
     comment_id: str,
     current_user: dict = Depends(get_current_user)
 ):
@@ -358,6 +362,7 @@ async def like_comment(
 @limiter.limit(RATE_LIMIT_COMMENT_DELETE)
 async def delete_comment(
     request: Request,
+    response: Response,
     comment_id: str,
     current_user: dict = Depends(get_current_user)
 ):
@@ -422,6 +427,7 @@ async def delete_comment(
 @limiter.limit(RATE_LIMIT_REPORT)
 async def report_comment(
     request: Request,
+    response: Response,
     comment_id: str,
     report_data: ReportCreate,
     current_user: dict = Depends(get_current_user)
