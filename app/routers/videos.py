@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends, UploadFile, File, Form, Query
+from fastapi import APIRouter, HTTPException, status, Depends, UploadFile, File, Form, Query, Request
 from typing import Optional, List
 from bson import ObjectId
 from datetime import datetime, timezone, timedelta
@@ -13,12 +13,15 @@ from app.utils.video_processing import video_processor
 from app.utils.video_queue import video_queue
 from app.config import settings
 from app.utils.datetime_helper import format_datetime_response
+from app.utils.rate_limit import limiter, RATE_LIMIT_VIDEO_UPLOAD, RATE_LIMIT_READ, RATE_LIMIT_PROFILE_UPDATE
 
 router = APIRouter(prefix="/videos", tags=["videos"])
 
 
 @router.post("/upload", response_model=APIResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit(RATE_LIMIT_VIDEO_UPLOAD)
 async def upload_video(
+    request: Request,
     title: str = Form(...),
     description: Optional[str] = Form(None),
     tags: Optional[str] = Form(None),  # Comma-separated tags
@@ -30,6 +33,7 @@ async def upload_video(
     """
     Upload a new video (requires authentication)
     Returns immediately after upload, video will be processed in background
+    Rate limit: 5 per hour per IP (STRICT to prevent spam)
     """
     db = get_database()
     
@@ -195,12 +199,15 @@ async def upload_video(
 
 
 @router.get("/{video_id}/status", response_model=APIResponse)
+@limiter.limit(RATE_LIMIT_READ)
 async def get_video_processing_status(
+    request: Request,
     video_id: str,
     current_user: dict = Depends(get_current_user)
 ):
     """
     Get video processing status (authenticated users only)
+    Rate limit: 500 per hour per IP
     """
     db = get_database()
     
@@ -246,7 +253,9 @@ async def get_video_processing_status(
 
 
 @router.post("/{video_id}/view", response_model=APIResponse)
+@limiter.limit(RATE_LIMIT_READ)
 async def track_video_view(
+    request: Request,
     video_id: str,
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
@@ -254,6 +263,7 @@ async def track_video_view(
     Track a video view (call when video starts playing)
     Works for both authenticated and unauthenticated users
     Also records to user view history for authenticated users to prevent duplicate recommendations
+    Rate limit: 500 per hour per IP
     """
     db = get_database()
     
@@ -313,7 +323,9 @@ async def track_video_view(
 
 
 @router.get("/my-videos", response_model=APIResponse)
+@limiter.limit(RATE_LIMIT_READ)
 async def search_my_videos(
+    request: Request,
     query: Optional[str] = Query(None, description="Search query for your video titles and descriptions"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -321,6 +333,7 @@ async def search_my_videos(
 ):
     """
     Search through the authenticated user's own videos
+    Rate limit: 500 per hour per IP
     """
     db = get_database()
     user_id = str(current_user["_id"])
@@ -422,13 +435,16 @@ async def search_my_videos(
 
 
 @router.get("/{video_id}", response_model=APIResponse)
+@limiter.limit(RATE_LIMIT_READ)
 async def get_video(
+    request: Request,
     video_id: str,
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """
     Get video details (public endpoint, but shows user interaction if authenticated)
     Does NOT increment view count - use POST /{video_id}/view for that
+    Rate limit: 500 per hour per IP
     """
     db = get_database()
     
@@ -504,12 +520,15 @@ async def get_video(
 
 
 @router.delete("/{video_id}", response_model=APIResponse)
+@limiter.limit(RATE_LIMIT_PROFILE_UPDATE)
 async def delete_video(
+    request: Request,
     video_id: str,
     current_user: dict = Depends(get_current_user)
 ):
     """
     Delete video (only uploader can delete)
+    Rate limit: 20 per hour per IP
     """
     db = get_database()
     

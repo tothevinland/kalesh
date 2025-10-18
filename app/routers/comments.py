@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Query
+from fastapi import APIRouter, HTTPException, status, Depends, Query, Request
 from typing import Optional
 from bson import ObjectId
 from datetime import datetime, timezone
@@ -6,18 +6,30 @@ from app.schemas import CommentCreate, CommentResponse, CommentWithReplies, APIR
 from app.auth import get_current_user, get_current_user_optional
 from app.database import get_database
 from app.utils.datetime_helper import format_datetime_response
+from app.utils.rate_limit import (
+    limiter,
+    RATE_LIMIT_COMMENT_CREATE,
+    RATE_LIMIT_COMMENT_REPLY,
+    RATE_LIMIT_COMMENT_LIKE,
+    RATE_LIMIT_COMMENT_DELETE,
+    RATE_LIMIT_REPORT,
+    RATE_LIMIT_READ
+)
 
 router = APIRouter(prefix="/comments", tags=["comments"])
 
 
 @router.post("/videos/{video_id}", response_model=APIResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit(RATE_LIMIT_COMMENT_CREATE)
 async def create_comment(
+    request: Request,
     video_id: str,
     comment_data: CommentCreate,
     current_user: dict = Depends(get_current_user)
 ):
     """
     Create a comment on a video
+    Rate limit: 20 per hour per IP (STRICT anti-spam)
     """
     db = get_database()
     
@@ -73,13 +85,16 @@ async def create_comment(
 
 
 @router.post("/{comment_id}/reply", response_model=APIResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit(RATE_LIMIT_COMMENT_REPLY)
 async def reply_to_comment(
+    request: Request,
     comment_id: str,
     reply_data: CommentCreate,
     current_user: dict = Depends(get_current_user)
 ):
     """
     Reply to a comment (only 1 level deep - no nested replies)
+    Rate limit: 30 per hour per IP (STRICT anti-spam)
     """
     db = get_database()
     
@@ -148,7 +163,9 @@ async def reply_to_comment(
 
 
 @router.get("/videos/{video_id}", response_model=APIResponse)
+@limiter.limit(RATE_LIMIT_READ)
 async def get_video_comments(
+    request: Request,
     video_id: str,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -156,6 +173,7 @@ async def get_video_comments(
 ):
     """
     Get all comments for a video with their replies
+    Rate limit: 500 per hour per IP
     """
     db = get_database()
     
@@ -260,12 +278,15 @@ async def get_video_comments(
 
 
 @router.post("/{comment_id}/like", response_model=APIResponse)
+@limiter.limit(RATE_LIMIT_COMMENT_LIKE)
 async def like_comment(
+    request: Request,
     comment_id: str,
     current_user: dict = Depends(get_current_user)
 ):
     """
     Like or unlike a comment (toggle)
+    Rate limit: 60 per hour per IP
     """
     db = get_database()
     user_id = str(current_user["_id"])
@@ -334,12 +355,15 @@ async def like_comment(
 
 
 @router.delete("/{comment_id}", response_model=APIResponse)
+@limiter.limit(RATE_LIMIT_COMMENT_DELETE)
 async def delete_comment(
+    request: Request,
     comment_id: str,
     current_user: dict = Depends(get_current_user)
 ):
     """
     Delete a comment (only owner can delete)
+    Rate limit: 20 per hour per IP
     """
     db = get_database()
     
@@ -395,13 +419,16 @@ async def delete_comment(
 
 
 @router.post("/{comment_id}/report", response_model=APIResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit(RATE_LIMIT_REPORT)
 async def report_comment(
+    request: Request,
     comment_id: str,
     report_data: ReportCreate,
     current_user: dict = Depends(get_current_user)
 ):
     """
     Report a comment
+    Rate limit: 10 per hour per IP (STRICT)
     """
     db = get_database()
     user_id = str(current_user["_id"])

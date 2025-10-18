@@ -1,21 +1,25 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Request
 from bson import ObjectId
 from datetime import datetime, timezone
 from app.schemas import InteractionResponse, ReportCreate, APIResponse
 from app.auth import get_current_user
 from app.database import get_database
 from app.utils.datetime_helper import format_datetime_response
+from app.utils.rate_limit import limiter, RATE_LIMIT_VIDEO_INTERACTION, RATE_LIMIT_REPORT
 
 router = APIRouter(prefix="/interactions", tags=["interactions"])
 
 
 @router.post("/videos/{video_id}/like", response_model=APIResponse)
+@limiter.limit(RATE_LIMIT_VIDEO_INTERACTION)
 async def like_video(
+    request: Request,
     video_id: str,
     current_user: dict = Depends(get_current_user)
 ):
     """
     Like a video (toggle - like/unlike)
+    Rate limit: 100 per hour per IP
     """
     db = get_database()
     user_id = str(current_user["_id"])
@@ -100,12 +104,15 @@ async def like_video(
 
 
 @router.post("/videos/{video_id}/dislike", response_model=APIResponse)
+@limiter.limit(RATE_LIMIT_VIDEO_INTERACTION)
 async def dislike_video(
+    request: Request,
     video_id: str,
     current_user: dict = Depends(get_current_user)
 ):
     """
     Dislike a video (toggle - dislike/undislike)
+    Rate limit: 100 per hour per IP
     """
     db = get_database()
     user_id = str(current_user["_id"])
@@ -190,12 +197,15 @@ async def dislike_video(
 
 
 @router.post("/videos/{video_id}/save", response_model=APIResponse)
+@limiter.limit(RATE_LIMIT_VIDEO_INTERACTION)
 async def save_video(
+    request: Request,
     video_id: str,
     current_user: dict = Depends(get_current_user)
 ):
     """
     Save/bookmark a video (toggle - save/unsave)
+    Rate limit: 100 per hour per IP
     """
     db = get_database()
     user_id = str(current_user["_id"])
@@ -266,13 +276,16 @@ async def save_video(
 
 
 @router.post("/videos/{video_id}/report", response_model=APIResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit(RATE_LIMIT_REPORT)
 async def report_video(
+    request: Request,
     video_id: str,
     report_data: ReportCreate,
     current_user: dict = Depends(get_current_user)
 ):
     """
     Report a video
+    Rate limit: 10 per hour per IP (STRICT)
     """
     db = get_database()
     user_id = str(current_user["_id"])

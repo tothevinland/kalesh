@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Query
+from fastapi import APIRouter, HTTPException, status, Depends, Query, Request
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
@@ -6,17 +6,21 @@ from app.schemas import APIResponse
 from app.auth import get_current_user, get_current_user_optional
 from app.database import get_database
 from app.utils.datetime_helper import format_datetime_response
+from app.utils.rate_limit import limiter, RATE_LIMIT_READ
 
 router = APIRouter(prefix="/tags", tags=["tags"])
 
 
 @router.get("/trending", response_model=APIResponse)
+@limiter.limit(RATE_LIMIT_READ)
 async def get_trending_tags(
+    request: Request,
     limit: int = Query(10, ge=1, le=50),
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """
     Get trending tags based on recent video uploads and views
+    Rate limit: 500 per hour per IP
     """
     db = get_database()
     
@@ -83,7 +87,9 @@ async def get_trending_tags(
 
 
 @router.get("/suggest", response_model=APIResponse)
+@limiter.limit(RATE_LIMIT_READ)
 async def suggest_tags(
+    request: Request,
     query: str = Query(..., min_length=1, max_length=50),
     limit: int = Query(10, ge=1, le=50),
     current_user: Optional[dict] = Depends(get_current_user_optional)
@@ -137,7 +143,9 @@ async def suggest_tags(
 
 
 @router.get("/explore", response_model=APIResponse)
+@limiter.limit(RATE_LIMIT_READ)
 async def explore_by_tag(
+    request: Request,
     tag: str = Query(..., min_length=1, max_length=50),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=50),

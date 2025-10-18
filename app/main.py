@@ -2,9 +2,12 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from app.database import connect_to_mongo, close_mongo_connection
 from app.routers import users, videos, interactions, feeds, comments, tags
 from app.config import settings
+from app.utils.rate_limit import limiter
 
 
 @asynccontextmanager
@@ -33,6 +36,10 @@ app = FastAPI(
     docs_url=None,
     redoc_url=None
 )
+
+# Add rate limiter state and exception handler
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS middleware
 app.add_middleware(

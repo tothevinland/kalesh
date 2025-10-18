@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends, UploadFile, File
+from fastapi import APIRouter, HTTPException, status, Depends, UploadFile, File, Request
 from datetime import timedelta
 from bson import ObjectId
 from app.schemas import UserRegister, UserLogin, Token, UserProfile, UserProfileUpdate, APIResponse
@@ -8,14 +8,24 @@ from app.config import settings
 from app.utils.storage import r2_storage
 from app.models import NSFWPreference
 from app.utils.datetime_helper import format_datetime_response
+from app.utils.rate_limit import (
+    limiter,
+    RATE_LIMIT_REGISTER,
+    RATE_LIMIT_LOGIN,
+    RATE_LIMIT_PROFILE_UPDATE,
+    RATE_LIMIT_AVATAR_UPLOAD,
+    RATE_LIMIT_READ
+)
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 
 @router.post("/register", response_model=APIResponse, status_code=status.HTTP_201_CREATED)
-async def register_user(user_data: UserRegister):
+@limiter.limit(RATE_LIMIT_REGISTER)
+async def register_user(request: Request, user_data: UserRegister):
     """
     Register a new user - only username and password required
+    Rate limit: 3 per hour per IP
     """
     db = get_database()
     
@@ -65,9 +75,11 @@ async def register_user(user_data: UserRegister):
 
 
 @router.post("/login", response_model=APIResponse)
-async def login_user(user_data: UserLogin):
+@limiter.limit(RATE_LIMIT_LOGIN)
+async def login_user(request: Request, user_data: UserLogin):
     """
     Login user with username and password
+    Rate limit: 10 per hour per IP
     """
     db = get_database()
     
@@ -114,9 +126,11 @@ async def login_user(user_data: UserLogin):
 
 
 @router.get("/profile", response_model=APIResponse)
-async def get_user_profile(current_user: dict = Depends(get_current_user)):
+@limiter.limit(RATE_LIMIT_READ)
+async def get_user_profile(request: Request, current_user: dict = Depends(get_current_user)):
     """
     Get current user's profile
+    Rate limit: 500 per hour per IP
     """
     # Convert existing boolean show_nsfw to enum if needed
     show_nsfw_value = current_user.get("show_nsfw", NSFWPreference.ASK)
@@ -143,9 +157,11 @@ async def get_user_profile(current_user: dict = Depends(get_current_user)):
 
 
 @router.get("/profile/{username}", response_model=APIResponse)
-async def get_user_profile_by_username(username: str):
+@limiter.limit(RATE_LIMIT_READ)
+async def get_user_profile_by_username(request: Request, username: str):
     """
     Get user profile by username (public endpoint)
+    Rate limit: 500 per hour per IP
     """
     db = get_database()
     
@@ -174,12 +190,15 @@ async def get_user_profile_by_username(username: str):
 
 
 @router.put("/profile", response_model=APIResponse)
+@limiter.limit(RATE_LIMIT_PROFILE_UPDATE)
 async def update_user_profile(
+    request: Request,
     profile_data: UserProfileUpdate,
     current_user: dict = Depends(get_current_user)
 ):
     """
     Update current user's profile information
+    Rate limit: 20 per hour per IP
     """
     db = get_database()
     
@@ -226,12 +245,15 @@ async def update_user_profile(
 
 
 @router.post("/avatar/upload", response_model=APIResponse)
+@limiter.limit(RATE_LIMIT_AVATAR_UPLOAD)
 async def upload_avatar(
+    request: Request,
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user)
 ):
     """
     Upload or update user's profile avatar/image
+    Rate limit: 5 per hour per IP
     """
     # Validate file type
     allowed_image_types = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]

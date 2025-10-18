@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Query
+from fastapi import APIRouter, HTTPException, status, Depends, Query, Request
 from typing import Optional, List
 from bson import ObjectId
 from datetime import datetime, timezone, timedelta
@@ -7,6 +7,7 @@ from app.auth import get_current_user, get_current_user_optional
 from app.database import get_database
 from app.models import NSFWPreference
 from app.utils.datetime_helper import format_datetime_response
+from app.utils.rate_limit import limiter, RATE_LIMIT_READ
 
 import random
 
@@ -14,7 +15,9 @@ router = APIRouter(prefix="/feeds", tags=["feeds"])
 
 
 @router.get("/trending", response_model=APIResponse)
+@limiter.limit(RATE_LIMIT_READ)
 async def get_trending_videos(
+    request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     current_user: Optional[dict] = Depends(get_current_user_optional)
@@ -22,6 +25,7 @@ async def get_trending_videos(
     """
     Get trending videos (sorted by likes + views + recency) with some randomization
     Excludes videos the user has already seen
+    Rate limit: 500 per hour per IP
     """
     db = get_database()
     
@@ -238,7 +242,9 @@ async def get_trending_videos(
 
 
 @router.get("/recent", response_model=APIResponse)
+@limiter.limit(RATE_LIMIT_READ)
 async def get_recent_videos(
+    request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     current_user: Optional[dict] = Depends(get_current_user_optional)
@@ -439,7 +445,9 @@ async def get_recent_videos(
 
 
 @router.get("/saved", response_model=APIResponse)
+@limiter.limit(RATE_LIMIT_READ)
 async def get_saved_videos(
+    request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     current_user: dict = Depends(get_current_user)
@@ -539,7 +547,9 @@ async def get_saved_videos(
 
 
 @router.get("/discover", response_model=APIResponse)
+@limiter.limit(RATE_LIMIT_READ)
 async def discover_videos(
+    request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     current_user: Optional[dict] = Depends(get_current_user_optional)
@@ -743,7 +753,9 @@ async def discover_videos(
 
 
 @router.get("/search", response_model=APIResponse)
+@limiter.limit(RATE_LIMIT_READ)
 async def search_videos(
+    request: Request,
     query: str = Query(..., min_length=1, description="Search query for video titles and descriptions"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=50),
@@ -899,7 +911,9 @@ async def search_videos(
 
 
 @router.get("/user/{username}", response_model=APIResponse)
+@limiter.limit(RATE_LIMIT_READ)
 async def get_user_videos(
+    request: Request,
     username: str,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
