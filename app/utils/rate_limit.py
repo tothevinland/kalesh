@@ -49,8 +49,8 @@ RATE_LIMIT_COMMENT_LIKE = "60 per hour"
 # MODERATE: Comment deletion (20 per hour per IP)
 RATE_LIMIT_COMMENT_DELETE = "20 per hour"
 
-# STRICT: Video upload (5 per hour per IP)
-RATE_LIMIT_VIDEO_UPLOAD = "5 per hour"
+# MODERATE: Video upload (30 per hour per IP - allows legitimate uploaders)
+RATE_LIMIT_VIDEO_UPLOAD = "30 per hour"
 
 # MODERATE: Video interactions (like, dislike, favorite)
 RATE_LIMIT_VIDEO_INTERACTION = "100 per hour"

@@ -12,40 +12,34 @@ class VideoProcessor:
     @staticmethod
     def get_watermark_filter(duration: float, width: int, height: int) -> str:
         """
-        Generate watermark filter with position that changes based on video duration
-        This makes it harder to crop out the watermark
+        Generate watermark filter with centered position and slight randomness
         """
-        # Calculate font size based on video resolution (bigger for higher res)
-        font_size = max(int(height * 0.06), 32)  # 6% of height, minimum 32px
+        # Calculate smaller font size (3% of height, looks professional)
+        font_size = max(int(height * 0.03), 24)  # 3% of height, minimum 24px
         
-        # Determine position based on video duration (cycles through positions)
-        # This prevents people from easily cropping the watermark
-        duration_mod = int(duration) % 4
+        # Add slight randomness to center position based on duration
+        # This keeps it centered but slightly different each time
+        duration_seed = int(duration * 10) % 8
         
-        if duration_mod == 0:
-            # Top right
-            position = f"x=w-tw-{int(width*0.02)}:y={int(height*0.02)}"
-        elif duration_mod == 1:
-            # Top left  
-            position = f"x={int(width*0.02)}:y={int(height*0.02)}"
-        elif duration_mod == 2:
-            # Bottom right
-            position = f"x=w-tw-{int(width*0.02)}:y=h-th-{int(height*0.02)}"
-        else:
-            # Bottom left
-            position = f"x={int(width*0.02)}:y=h-th-{int(height*0.02)}"
+        # Calculate random offset from center (within 10% of screen dimensions)
+        x_offset = int(width * 0.1 * ((duration_seed % 4) - 1.5) / 1.5)
+        y_offset = int(height * 0.1 * ((duration_seed // 4) - 0.5) / 0.5)
         
-        # Create drawtext filter with semi-transparent white text and black outline
+        # Center position with random offset
+        position = f"x=(w-tw)/2+{x_offset}:y=(h-th)/2+{y_offset}"
+        
+        # Create drawtext filter with nice styling
+        # Using default font which is usually DejaVu Sans (clean and professional)
         watermark_filter = (
             f"drawtext=text='KALESH.ME':"
             f"fontsize={font_size}:"
-            f"fontcolor=white@0.7:"  # 70% opacity white
-            f"borderw=3:"  # Border width
-            f"bordercolor=black@0.5:"  # 50% opacity black border
+            f"fontcolor=white@0.5:"  # 50% opacity white (more subtle)
+            f"borderw=2:"  # Thinner border
+            f"bordercolor=black@0.4:"  # Subtle black border
             f"{position}:"
-            f"box=1:"  # Enable box behind text
-            f"boxcolor=black@0.3:"  # 30% opacity black box
-            f"boxborderw=10"  # Box padding
+            f"shadowcolor=black@0.3:"  # Soft shadow
+            f"shadowx=2:"
+            f"shadowy=2"
         )
         
         return watermark_filter
