@@ -10,41 +10,6 @@ from app.config import settings
 class VideoProcessor:
     # Quality presets are now loaded from config settings
     @staticmethod
-    def get_watermark_filter(duration: float, width: int, height: int) -> str:
-        """
-        Generate watermark filter with centered position and slight randomness
-        """
-        # Calculate smaller font size (3% of height, looks professional)
-        font_size = max(int(height * 0.03), 24)  # 3% of height, minimum 24px
-        
-        # Add slight randomness to center position based on duration
-        # This keeps it centered but slightly different each time
-        duration_seed = int(duration * 10) % 8
-        
-        # Calculate random offset from center (within 10% of screen dimensions)
-        x_offset = int(width * 0.1 * ((duration_seed % 4) - 1.5) / 1.5)
-        y_offset = int(height * 0.1 * ((duration_seed // 4) - 0.5) / 0.5)
-        
-        # Center position with random offset
-        position = f"x=(w-tw)/2+{x_offset}:y=(h-th)/2+{y_offset}"
-        
-        # Create drawtext filter with nice styling
-        # Using default font which is usually DejaVu Sans (clean and professional)
-        watermark_filter = (
-            f"drawtext=text='KALESH.ME':"
-            f"fontsize={font_size}:"
-            f"fontcolor=white@0.5:"  # 50% opacity white (more subtle)
-            f"borderw=2:"  # Thinner border
-            f"bordercolor=black@0.4:"  # Subtle black border
-            f"{position}:"
-            f"shadowcolor=black@0.3:"  # Soft shadow
-            f"shadowx=2:"
-            f"shadowy=2"
-        )
-        
-        return watermark_filter
-    
-    @staticmethod
     def get_qualities():
         return {
             '1080p': {
@@ -113,11 +78,6 @@ class VideoProcessor:
                 'playlists': {}
             }
             
-            # Get video info for watermark
-            video_duration = await VideoProcessor.get_video_duration(video_path)
-            if not video_duration:
-                video_duration = 30.0  # Default if we can't get duration
-            
             # Get video resolution to determine available qualities
             video_height = await VideoProcessor.get_video_height(video_path)
             
@@ -143,15 +103,8 @@ class VideoProcessor:
                 
                 output_path = os.path.join(quality_dir, 'playlist.m3u8')
                 
-                # Generate watermark filter for this quality
-                watermark_filter = VideoProcessor.get_watermark_filter(
-                    video_duration, 
-                    settings_dict['width'], 
-                    settings_dict['height']
-                )
-                
-                # Combine scale and watermark filters
-                video_filter = f"scale={settings_dict['width']}:{settings_dict['height']}:force_original_aspect_ratio=decrease,{watermark_filter}"
+                # Video filter (just scaling, no watermark)
+                video_filter = f"scale={settings_dict['width']}:{settings_dict['height']}:force_original_aspect_ratio=decrease"
                 
                 # FFmpeg command for HLS with improved compression
                 # Check if we should use two-pass encoding
