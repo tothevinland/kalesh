@@ -10,6 +10,47 @@ from app.config import settings
 class VideoProcessor:
     # Quality presets are now loaded from config settings
     @staticmethod
+    def get_watermark_filter(duration: float, width: int, height: int) -> str:
+        """
+        Generate watermark filter with position that changes based on video duration
+        This makes it harder to crop out the watermark
+        """
+        # Calculate font size based on video resolution (bigger for higher res)
+        font_size = max(int(height * 0.06), 32)  # 6% of height, minimum 32px
+        
+        # Determine position based on video duration (cycles through positions)
+        # This prevents people from easily cropping the watermark
+        duration_mod = int(duration) % 4
+        
+        if duration_mod == 0:
+            # Top right
+            position = f"x=w-tw-{int(width*0.02)}:y={int(height*0.02)}"
+        elif duration_mod == 1:
+            # Top left  
+            position = f"x={int(width*0.02)}:y={int(height*0.02)}"
+        elif duration_mod == 2:
+            # Bottom right
+            position = f"x=w-tw-{int(width*0.02)}:y=h-th-{int(height*0.02)}"
+        else:
+            # Bottom left
+            position = f"x={int(width*0.02)}:y=h-th-{int(height*0.02)}"
+        
+        # Create drawtext filter with semi-transparent white text and black outline
+        watermark_filter = (
+            f"drawtext=text='KALESH.ME':"
+            f"fontsize={font_size}:"
+            f"fontcolor=white@0.7:"  # 70% opacity white
+            f"borderw=3:"  # Border width
+            f"bordercolor=black@0.5:"  # 50% opacity black border
+            f"{position}:"
+            f"box=1:"  # Enable box behind text
+            f"boxcolor=black@0.3:"  # 30% opacity black box
+            f"boxborderw=10"  # Box padding
+        )
+        
+        return watermark_filter
+    
+    @staticmethod
     def get_qualities():
         return {
             '1080p': {
@@ -78,6 +119,11 @@ class VideoProcessor:
                 'playlists': {}
             }
             
+            # Get video info for watermark
+            video_duration = await VideoProcessor.get_video_duration(video_path)
+            if not video_duration:
+                video_duration = 30.0  # Default if we can't get duration
+            
             # Get video resolution to determine available qualities
             video_height = await VideoProcessor.get_video_height(video_path)
             
@@ -97,11 +143,21 @@ class VideoProcessor:
             # Generate HLS for each quality
             master_playlist_lines = ['#EXTM3U', '#EXT-X-VERSION:3']
             
-            for quality, settings in available_qualities.items():
+            for quality, settings_dict in available_qualities.items():
                 quality_dir = os.path.join(temp_dir, quality)
                 os.makedirs(quality_dir, exist_ok=True)
                 
                 output_path = os.path.join(quality_dir, 'playlist.m3u8')
+                
+                # Generate watermark filter for this quality
+                watermark_filter = VideoProcessor.get_watermark_filter(
+                    video_duration, 
+                    settings_dict['width'], 
+                    settings_dict['height']
+                )
+                
+                # Combine scale and watermark filters
+                video_filter = f"scale={settings_dict['width']}:{settings_dict['height']}:force_original_aspect_ratio=decrease,{watermark_filter}"
                 
                 # FFmpeg command for HLS with improved compression
                 # Check if we should use two-pass encoding
@@ -113,12 +169,12 @@ class VideoProcessor:
                         '/usr/bin/ffmpeg',
                     '-y',
                     '-i', video_path,
-                    '-vf', f"scale={settings['width']}:{settings['height']}:force_original_aspect_ratio=decrease",
+                    '-vf', video_filter,
                     '-c:v', 'libx264',
-                    '-b:v', settings['bitrate'],
-                    '-maxrate', f"{int(float(settings['bitrate'].replace('k', '')) * 1.5)}k",
-                    '-bufsize', f"{int(float(settings['bitrate'].replace('k', '')) * 2)}k",
-                    '-crf', str(settings['crf']),
+                    '-b:v', settings_dict['bitrate'],
+                    '-maxrate', f"{int(float(settings_dict['bitrate'].replace('k', '')) * 1.5)}k",
+                    '-bufsize', f"{int(float(settings_dict['bitrate'].replace('k', '')) * 2)}k",
+                    '-crf', str(settings_dict['crf']),
                     '-preset', getattr(settings, 'VIDEO_COMPRESSION_PRESET', 'medium'),
                     '-x264opts', 'keyint=48:min-keyint=48:no-scenecut',
                     '-an',  # No audio in first pass
@@ -136,16 +192,16 @@ class VideoProcessor:
                         cmd = [
                             '/usr/bin/ffmpeg',
                         '-i', video_path,
-                        '-vf', f"scale={settings['width']}:{settings['height']}:force_original_aspect_ratio=decrease",
+                        '-vf', video_filter,
                         '-c:v', 'libx264',
-                        '-b:v', settings['bitrate'],
-                        '-maxrate', f"{int(float(settings['bitrate'].replace('k', '')) * 1.5)}k",
-                        '-bufsize', f"{int(float(settings['bitrate'].replace('k', '')) * 2)}k",
-                        '-crf', str(settings['crf']),
+                        '-b:v', settings_dict['bitrate'],
+                        '-maxrate', f"{int(float(settings_dict['bitrate'].replace('k', '')) * 1.5)}k",
+                        '-bufsize', f"{int(float(settings_dict['bitrate'].replace('k', '')) * 2)}k",
+                        '-crf', str(settings_dict['crf']),
                         '-preset', getattr(settings, 'VIDEO_COMPRESSION_PRESET', 'medium'),
                         '-x264opts', 'keyint=48:min-keyint=48:no-scenecut',
                         '-c:a', 'aac',
-                        '-b:a', settings['audio_bitrate'],
+                        '-b:a', settings_dict['audio_bitrate'],
                         '-ac', '2',  # Stereo audio
                         '-ar', '44100',  # Audio sample rate
                         '-hls_time', '6',
@@ -161,13 +217,13 @@ class VideoProcessor:
                         cmd = [
                             '/usr/bin/ffmpeg',
                         '-i', video_path,
-                        '-vf', f"scale={settings['width']}:{settings['height']}:force_original_aspect_ratio=decrease",
+                        '-vf', video_filter,
                         '-c:v', 'libx264',
-                        '-b:v', settings['bitrate'],
-                        '-crf', str(settings['crf']),
+                        '-b:v', settings_dict['bitrate'],
+                        '-crf', str(settings_dict['crf']),
                         '-preset', 'medium',  # Fallback preset
                         '-c:a', 'aac',
-                        '-b:a', settings['audio_bitrate'],
+                        '-b:a', settings_dict['audio_bitrate'],
                         '-hls_time', '6',
                         '-hls_playlist_type', 'vod',
                         '-hls_segment_filename', os.path.join(quality_dir, 'segment_%03d.ts'),
@@ -186,15 +242,15 @@ class VideoProcessor:
                         '/usr/bin/ffmpeg',
                         '-i', video_path,
                     ] + thread_param + [
-                        '-vf', f"scale={settings['width']}:{settings['height']}:force_original_aspect_ratio=decrease",
+                        '-vf', video_filter,
                         '-c:v', 'libx264',
-                        '-b:v', settings['bitrate'],
-                        '-maxrate', f"{int(float(settings['bitrate'].replace('k', '')) * 1.5)}k",
-                        '-bufsize', f"{int(float(settings['bitrate'].replace('k', '')) * 2)}k",
-                        '-crf', str(settings['crf']),
+                        '-b:v', settings_dict['bitrate'],
+                        '-maxrate', f"{int(float(settings_dict['bitrate'].replace('k', '')) * 1.5)}k",
+                        '-bufsize', f"{int(float(settings_dict['bitrate'].replace('k', '')) * 2)}k",
+                        '-crf', str(settings_dict['crf']),
                         '-preset', getattr(settings, 'VIDEO_COMPRESSION_PRESET', 'medium'),
                         '-c:a', 'aac',
-                        '-b:a', settings['audio_bitrate'],
+                        '-b:a', settings_dict['audio_bitrate'],
                         '-ac', '2',  # Stereo audio
                         '-ar', '44100',  # Audio sample rate
                         '-hls_time', '6',
@@ -226,8 +282,8 @@ class VideoProcessor:
                     }
                     
                     # Add to master playlist
-                    bandwidth = int(settings['bitrate'].replace('k', '000'))
-                    resolution = f"{settings['width']}x{settings['height']}"
+                    bandwidth = int(settings_dict['bitrate'].replace('k', '000'))
+                    resolution = f"{settings_dict['width']}x{settings_dict['height']}"
                     master_playlist_lines.append(f'#EXT-X-STREAM-INF:BANDWIDTH={bandwidth},RESOLUTION={resolution}')
                     master_playlist_lines.append(f'{quality}/playlist.m3u8')
             
